@@ -1,0 +1,736 @@
+{
+  "info": {
+    "name": "AssignMate API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000/api/v1"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "user_email",
+      "value": "teacher@example.com"
+    },
+    {
+      "key": "user_password",
+      "value": "ChangeMe123!"
+    },
+    {
+      "key": "course_id",
+      "value": ""
+    },
+    {
+      "key": "lesson_order",
+      "value": ""
+    },
+    {
+      "key": "lesson_pk",
+      "value": ""
+    },
+    {
+      "key": "homework_order",
+      "value": ""
+    },
+    {
+      "key": "homework_pk",
+      "value": ""
+    },
+    {
+      "key": "submission_id",
+      "value": ""
+    },
+    {
+      "key": "invite_code",
+      "value": ""
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/register/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\",\n  \"password_confirm\": \"{{user_password}}\",\n  \"first_name\": \"Test\",\n  \"last_name\": \"Teacher\",\n  \"role\": \"TEACHER\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('access_token', json.access);",
+                  "  pm.collectionVariables.set('refresh_token', json.refresh);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('access_token', json.access);",
+                  "  pm.collectionVariables.set('refresh_token', json.refresh);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/refresh/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('access_token', json.access);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/logout/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/auth/me/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Get Dashboard",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/dashboard/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Courses",
+      "item": [
+        {
+          "name": "List Courses",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/courses/"
+          }
+        },
+        {
+          "name": "Create Course",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Course 1\",\n  \"description\": \"Intro course\",\n  \"grading_scale\": {\"A\": 90, \"B\": 80}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('course_id', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Course",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/courses/{{course_id}}/"
+          }
+        },
+        {
+          "name": "Update Course (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{course_id}}/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated description\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Course",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/courses/{{course_id}}/"
+          }
+        },
+        {
+          "name": "Generate Invite Code",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/courses/{{course_id}}/invite-code/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('invite_code', json.invite_code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Join Course",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/join-by-code/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"invite_code\": \"{{invite_code}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Lessons",
+      "item": [
+        {
+          "name": "List Lessons",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/"
+          }
+        },
+        {
+          "name": "Create Lesson",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Lesson 1\",\n  \"description\": \"Basics\",\n  \"duration\": 45\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('lesson_order', json.order);",
+                  "  pm.collectionVariables.set('lesson_pk', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Lesson (by order)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_order}}/"
+          }
+        },
+        {
+          "name": "Update Lesson (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_order}}/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Lesson 1 updated\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Lesson",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_order}}/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Homeworks",
+      "item": [
+        {
+          "name": "List Homeworks",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_pk}}/homeworks/"
+          }
+        },
+        {
+          "name": "Create Homework - Single Choice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_pk}}/homeworks/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Single choice\",\n  \"description\": \"Choose one\",\n  \"type\": \"SINGLE_CHOICE\",\n  \"max_score\": 5,\n  \"details\": {\n    \"shuffle_options\": false,\n    \"options\": [\n      {\"text\": \"Option 1\", \"is_correct\": true},\n      {\"text\": \"Option 2\", \"is_correct\": false}\n    ]\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('homework_order', json.order);",
+                  "  pm.collectionVariables.set('homework_pk', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Homework - Multiple Choice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_pk}}/homeworks/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Multiple choice\",\n  \"description\": \"Choose many\",\n  \"type\": \"MULTIPLE_CHOICE\",\n  \"max_score\": 5,\n  \"details\": {\n    \"shuffle_options\": true,\n    \"options\": [\n      {\"text\": \"Option 1\", \"is_correct\": true},\n      {\"text\": \"Option 2\", \"is_correct\": true},\n      {\"text\": \"Option 3\", \"is_correct\": false}\n    ]\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Homework - Fill Blank",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_pk}}/homeworks/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Fill blanks\",\n  \"description\": \"Insert missing words\",\n  \"type\": \"FILL_BLANK\",\n  \"max_score\": 5,\n  \"details\": {\n    \"text_template\": \"Python is a __ language. It was created by __.\",\n    \"blanks\": [\n      {\"position\": 1, \"correct_text\": \"high-level\"},\n      {\"position\": 2, \"correct_text\": \"Guido\"}\n    ]\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Homework - Short Answer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_pk}}/homeworks/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Short answer\",\n  \"description\": \"One word\",\n  \"type\": \"SHORT_ANSWER\",\n  \"max_score\": 3,\n  \"details\": {\n    \"max_length\": 30,\n    \"case_sensitive\": false\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Homework - Long Answer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_pk}}/homeworks/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Long answer\",\n  \"description\": \"Essay\",\n  \"type\": \"LONG_ANSWER\",\n  \"max_score\": 10,\n  \"details\": {\n    \"max_files\": 3\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Homework (by order)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_pk}}/homeworks/{{homework_order}}/"
+          }
+        },
+        {
+          "name": "Update Homework (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_pk}}/homeworks/{{homework_order}}/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Homework updated\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Homework",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_pk}}/homeworks/{{homework_order}}/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Submissions",
+      "item": [
+        {
+          "name": "List Submissions",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_pk}}/homeworks/{{homework_pk}}/submissions/"
+          }
+        },
+        {
+          "name": "Create Submission - Single Choice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_pk}}/homeworks/{{homework_pk}}/submissions/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"selected_option\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('submission_id', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Submission - Multiple Choice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_pk}}/homeworks/{{homework_pk}}/submissions/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"selected_options\": [1, 2]\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Submission - Fill Blank",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_pk}}/homeworks/{{homework_pk}}/submissions/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answers\": [\n    {\"position\": 1, \"answer_text\": \"high-level\"},\n    {\"position\": 2, \"answer_text\": \"Guido\"}\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Submission - Short Answer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_pk}}/homeworks/{{homework_pk}}/submissions/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answer_text\": \"Paris\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Submission - Long Answer (with files)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_pk}}/homeworks/{{homework_pk}}/submissions/",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "answer_text",
+                  "value": "Long answer text",
+                  "type": "text"
+                },
+                {
+                  "key": "files",
+                  "type": "file"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Submission",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_pk}}/homeworks/{{homework_pk}}/submissions/{{submission_id}}/"
+          }
+        },
+        {
+          "name": "Review Submission",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/courses/{{course_id}}/lessons/{{lesson_pk}}/homeworks/{{homework_pk}}/submissions/{{submission_id}}/review/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"score\": 5,\n  \"comment\": \"Good job\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stats",
+      "item": [
+        {
+          "name": "Courses Stats List",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/dashboard/courses/"
+          }
+        },
+        {
+          "name": "Course Stats Detail",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/dashboard/courses/{{course_id}}/"
+          }
+        },
+        {
+          "name": "Lesson Stats List",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/dashboard/courses/{{course_id}}/lessons/"
+          }
+        },
+        {
+          "name": "Lesson Stats Detail",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/dashboard/courses/{{course_id}}/lessons/{{lesson_order}}/"
+          }
+        },
+        {
+          "name": "Homework Stats List",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/dashboard/courses/{{course_id}}/homeworks/"
+          }
+        },
+        {
+          "name": "Homework Stats Detail",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/dashboard/courses/{{course_id}}/homeworks/{{homework_order}}/"
+          }
+        },
+        {
+          "name": "Course Students Stats",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/dashboard/courses/{{course_id}}/students/"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: assignmate
+      POSTGRES_USER: assignmate
+      POSTGRES_PASSWORD: assignmate
+    volumes:
+      - ./DockerVolumes/db-data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./AssignMate[Backend]
+      dockerfile: Dockerfile
+      target: stage
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings
+      SECRET_KEY: stage-secret-key
+      DEBUG: "0"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
+      INTERNAL_IPS: "127.0.0.1"
+      DATABASE_URL: "postgresql://assignmate:assignmate@db:5432/assignmate"
+      CORS_ALLOWED_ORIGINS: "http://localhost:8080"
+      CSRF_TRUSTED_ORIGINS: "http://localhost:8080"
+    command: >
+      sh -c "python manage.py migrate
+      && python manage.py collectstatic --noinput
+      && gunicorn config.wsgi:application --bind 0.0.0.0:8000"
+    volumes:
+      - ./DockerVolumes/backend-static:/app/static
+      - ./DockerVolumes/backend-media:/app/media
+    depends_on:
+      - db
+
+  nginx:
+    build:
+      context: ./AssignMate[Frontend]
+      dockerfile: Dockerfile
+      target: stage
+      args:
+        VITE_API_URL: "/api/v1"
+    ports:
+      - "8080:80"
+    volumes:
+      - ./DockerVolumes/backend-static:/var/www/static:ro
+      - ./DockerVolumes/backend-media:/var/www/media:ro
+    depends_on:
+      - backend

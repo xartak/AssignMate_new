@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: assignmate
+      POSTGRES_USER: assignmate
+      POSTGRES_PASSWORD: assignmate
+    volumes:
+      - ./DockerVolumes/db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: ./AssignMate[Backend]
+      dockerfile: Dockerfile
+      target: dev
+    env_file:
+      - ./AssignMate[Backend]/.env
+    volumes:
+      - ./AssignMate[Backend]:/app
+      - ./DockerVolumes/static:/app/static
+      - ./DockerVolumes/media:/app/media
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./AssignMate[Frontend]
+      dockerfile: Dockerfile
+      target: dev  # используем dev stage
+      args:
+        VITE_API_URL: ${VITE_API_URL}  # для build stage, но не влияет на dev
+    env_file:
+      - ./AssignMate[Frontend]/.env
+    environment:
+      # Эти переменные будут доступны в dev режиме
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    volumes:
+      # Монтируем исходники
+      - ./AssignMate[Frontend]:/app
+      # Анонимный том для node_modules, чтобы не перезаписывать
+      - /app/node_modules
+    ports:
+      - "5173:5173"

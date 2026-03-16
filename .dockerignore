@@ -1,0 +1,28 @@
+# PyCharm
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+**/.venv
+**/venv
+**/.cache
+**/*.log
+
+# Backend
+**/*.sqlite3
+AssignMate[[]Backend[]]/media
+AssignMate[[]Backend[]]/static
+
+# Frontend
+**/node_modules
+**/dist
+**/.vite
+
+# All
+**/Dockerfile
+README.md
+.dockerignore
+**/.env

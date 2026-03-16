@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+
+# Django
+*.log
+*.sqlite3
+/db.sqlite3
+
+# Virtualenv
+.venv/
+
+# IDE
+.idea/
+
+# OS
+.DS_Store
+
+# Frontend
+AssignMate[[]Frontend[]]/node_modules/
+AssignMate[[]Frontend[]]/dist/
+AssignMate[[]Frontend[]]/.env
+AssignMate[[]Frontend[]]/.env.*
+AssignMate[[]Frontend[]]/node_modules/
+
+# Backend
+AssignMate[[]Backend[]]/media/
+AssignMate[[]Backend[]]/.env
+
+#TgBot
+/TgBot/.env
+/TgBot/bot.db
+
+# Docker
+/DockerVolumes/
