@@ -26,6 +26,60 @@ class Course:
 
 
 @dataclass
+class Lesson:
+    """Модель урока"""
+    id: int
+    order: int
+    title: str
+    description: str
+    materials: str | None
+    duration: int | None
+
+    @classmethod
+    def from_dict(
+        cls,
+        data: dict,
+    ) -> 'Lesson':
+        return cls(
+            id=data.get('id'),
+            order=data.get('order', 0),
+            title=data.get('title', 'Без названия'),
+            description=data.get('description', ''),
+            materials=data.get('materials'),
+            duration=data.get('duration'),
+        )
+
+
+@dataclass
+class Homework:
+    """Модель домашнего задания"""
+    id: int
+    order: int
+    title: str
+    description: str
+    type: str
+    max_score: int | None
+    deadline: str | None
+    details: dict | None
+
+    @classmethod
+    def from_dict(
+        cls,
+        data: dict,
+    ) -> 'Homework':
+        return cls(
+            id=data.get('id'),
+            order=data.get('order', 0),
+            title=data.get('title', 'Без названия'),
+            description=data.get('description', ''),
+            type=data.get('type', ''),
+            max_score=data.get('max_score'),
+            deadline=data.get('deadline'),
+            details=data.get('details'),
+        )
+
+
+@dataclass
 class PaginatedResponse:
     """Модель для пагинированного ответа"""
     count: int

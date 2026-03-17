@@ -38,7 +38,7 @@ async def start_command(
         if user and user.is_authenticated:
             await message.answer(
                 text="👋 Вы уже авторизованы!\n"
-                "Используйте /courses для просмотра доступных курсов.",
+                "Используйте кнопку «Курсы» для просмотра доступных курсов.",
                 reply_markup=main_keyboard(),
             )
             return

@@ -4,7 +4,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from config.settings import settings
-from handlers import start, courses
+from handlers import start, courses, profile
 from middlewares.auth import AuthMiddleware
 
 # Настройка логирования
@@ -29,6 +29,7 @@ async def main():
     # Подключаем роутеры
     dp.include_router(start.router)
     dp.include_router(courses.router)
+    dp.include_router(profile.router)
 
     try:
         # Пропускаем накопившиеся апдейты и запускаем поллинг
