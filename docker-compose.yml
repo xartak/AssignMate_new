@@ -61,10 +61,7 @@ services:
       context: ./TgBot
       dockerfile: Dockerfile
     env_file:
-      - ./AssignMate[Backend]/.env
-    environment:
-      DATABASE_URL: "postgresql+asyncpg://assignmate_db:assignmate_db@tg_bot_db:5432/assignmate_db"
-      BACKEND_URL: "http://backend:8000"
+      - ./TgBot/.env
     depends_on:
       - tg_bot_db
       - backend

@@ -397,6 +397,14 @@ body.theme-purple nav button.secondary {
   font-size: 18px;
 }
 
+.cabinet-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .cabinet-details {
   background: #f7f5ff;
   border-radius: 16px;
@@ -473,38 +481,44 @@ body.theme-purple nav button.secondary {
 }
 
 .cabinet-telegram {
+  padding: 12px 14px;
+  gap: 8px;
   background: #f7f5ff;
-  border-radius: 16px;
   border: 1px dashed #d8d1ff;
-  padding: 14px 16px;
+  border-radius: 14px;
   display: grid;
-  gap: 12px;
+  align-self: start;
+  width: min(320px, 100%);
+  box-shadow: 0 8px 18px rgba(92, 74, 160, 0.12);
 }
 
-.cabinet-telegram .cabinet-card-header {
-  padding: 0;
+.cabinet-telegram-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: #2b2b2b;
 }
 
-.telegram-link {
-  display: grid;
-  gap: 6px;
-}
-
-.telegram-link a {
-  color: #4c30d1;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.telegram-link a:hover {
-  text-decoration: underline;
+.cabinet-telegram p {
+  margin: 0;
+  font-size: 12px;
 }
 
 .telegram-meta {
   display: grid;
   gap: 4px;
-  font-size: 12px;
+  font-size: 11px;
   color: #6c6a78;
+}
+
+.telegram-button {
+  background: linear-gradient(135deg, #5c4aa0 0%, #4a3a8f 100%);
+  box-shadow: 0 10px 20px rgba(92, 74, 160, 0.35);
+}
+
+.telegram-button.active {
+  background: linear-gradient(135deg, #2fb88a 0%, #1e936f 100%);
+  box-shadow: 0 0 0 2px rgba(47, 184, 138, 0.35),
+    0 14px 28px rgba(47, 184, 138, 0.45);
 }
 
 .courses-hero {
@@ -1036,6 +1050,16 @@ input[type="file"]::file-selector-button:hover {
 
   .cabinet-row {
     grid-template-columns: 120px 1fr;
+  }
+
+  .cabinet-card-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cabinet-telegram {
+    width: 100%;
+    max-width: none;
   }
 }
 

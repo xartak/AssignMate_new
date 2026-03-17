@@ -69,6 +69,10 @@ export function CabinetPage() {
     telegramExpiresAt && !Number.isNaN(telegramExpiresAt.getTime())
       ? telegramExpiresAt.toLocaleString()
       : telegramLink?.expires_at ?? "";
+  const telegramButtonLabel = telegramLink ? "Перейти в Telegram" : "Привязать Telegram";
+  const telegramButtonClass = telegramLink
+    ? "auth-button telegram-button active"
+    : "auth-button telegram-button";
 
   const detailRows = [
     { label: "Почта", value: profile.email },
@@ -153,6 +157,14 @@ export function CabinetPage() {
     }
   };
 
+  const handleTelegramAction = async () => {
+    if (telegramLink?.link) {
+      window.open(telegramLink.link, "_blank", "noopener,noreferrer");
+      return;
+    }
+    await handleGenerateTelegramLink();
+  };
+
   return (
     <div className="cabinet-page">
       <div className="page-header">
@@ -160,17 +172,36 @@ export function CabinetPage() {
           <h1>Личный кабинет</h1>
           <p>Ваши личные данные</p>
         </div>
-        {!isEditing && (
-          <button className="secondary" type="button" onClick={startEdit}>
-            Редактировать
-          </button>
-        )}
+          <div className="cabinet-telegram">
+            <div className="cabinet-telegram-title">Telegram</div>
+            {telegramError && <div className="auth-error">{telegramError}</div>}
+            <div className="form-actions end">
+              <button
+                className={telegramButtonClass}
+                type="button"
+                onClick={handleTelegramAction}
+                disabled={telegramLoading}
+              >
+                {telegramLoading ? "Создание..." : telegramButtonLabel}
+              </button>
+            </div>
+            <p className="muted">
+              Привяжите Telegram, чтобы получать уведомления и просматривать курсы.
+            </p>
+          </div>
       </div>
 
       <div className="cabinet-grid">
         <section className="cabinet-card">
-          <div className="cabinet-card-header">
-            <h2>Личные данные</h2>
+          <div className="cabinet-card-top">
+            <div className="cabinet-card-header">
+              <h2>Личные данные</h2>
+            </div>
+            {!isEditing && (
+              <button className="secondary" type="button" onClick={startEdit}>
+                Редактировать
+              </button>
+            )}
           </div>
           <div className="cabinet-details">
             {isEditing ? (
@@ -282,40 +313,6 @@ export function CabinetPage() {
               {bio ? <p>{bio}</p> : <span className="muted">Описание себя</span>}
             </div>
           )}
-          <div className="cabinet-telegram">
-            <div className="cabinet-card-header">
-              <h2>Telegram</h2>
-            </div>
-            <p className="muted">
-              Привяжите Telegram, чтобы получать уведомления и быстро входить через бота.
-            </p>
-            {telegramLink ? (
-              <div className="telegram-link">
-                <a href={telegramLink.link} target="_blank" rel="noreferrer">
-                  Открыть Telegram
-                </a>
-                <div className="telegram-meta">
-                  <span>Ссылка действительна до: {telegramExpiresLabel || "—"}</span>
-                  {telegramLink.note && <span>{telegramLink.note}</span>}
-                </div>
-              </div>
-            ) : (
-              <div className="telegram-placeholder">
-                <span className="muted">Ссылка ещё не создана.</span>
-              </div>
-            )}
-            {telegramError && <div className="auth-error">{telegramError}</div>}
-            <div className="form-actions end">
-              <button
-                className="auth-button"
-                type="button"
-                onClick={handleGenerateTelegramLink}
-                disabled={telegramLoading}
-              >
-                {telegramLoading ? "Создание..." : "Получить ссылку"}
-              </button>
-            </div>
-          </div>
         </section>
       </div>
     </div>
