@@ -30,19 +30,16 @@ services:
     build:
       context: ./AssignMate[Frontend]
       dockerfile: Dockerfile
-      target: dev  # используем dev stage
+      target: dev
       args:
-        VITE_API_URL: ${VITE_API_URL}  # для build stage, но не влияет на dev
+        VITE_API_URL: ${VITE_API_URL}
     env_file:
       - ./AssignMate[Frontend]/.env
     environment:
-      # Эти переменные будут доступны в dev режиме
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
     volumes:
-      # Монтируем исходники
       - ./AssignMate[Frontend]:/app
-      # Анонимный том для node_modules, чтобы не перезаписывать
       - /app/node_modules
     ports:
       - "5173:5173"
