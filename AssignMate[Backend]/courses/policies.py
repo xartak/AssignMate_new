@@ -150,7 +150,6 @@ class CoursePolicy:
             and (
                 getattr(user, "is_admin", False)
                 or course.author_id == user.id
-                or is_course_assistant(user, course)
             )
         )
 
@@ -227,7 +226,6 @@ class LessonPolicy:
             and (
                 getattr(user, "is_admin", False)
                 or course.author_id == user.id
-                or is_course_assistant(user, course)
             )
         )
 
