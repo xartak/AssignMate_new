@@ -65,11 +65,34 @@ class BackendAPIClient:
             logger.error(f"API request failed: {e}")
             return None
 
+    async def refresh_token(
+        self,
+        refresh_token: str,
+    ) -> Optional[Dict]:
+        """Обновление access/refresh токенов"""
+        url = f"{self.base_url}/api/v1/auth/refresh/"
+        payload = {"refresh": refresh_token}
+
+        try:
+            async with self.session.post(
+                url=url,
+                json=payload,
+            ) as response:
+                if response.status == 200:
+                    return await response.json()
+                else:
+                    error_text = await response.text()
+                    logger.error(f"Failed to refresh token. Status: {response.status}, Response: {error_text}")
+                    return None
+        except Exception as e:
+            logger.error(f"Refresh request failed: {e}")
+            return None
+
     async def get_courses(
         self,
         access_token: str,
         page_url: str = None,
-    ) -> Optional[PaginatedResponse]:
+    ) -> tuple[Optional[PaginatedResponse], int]:
         """
         Получение списка курсов с поддержкой пагинации
 
@@ -106,20 +129,20 @@ class BackendAPIClient:
                         item_parser=Course.from_dict
                     )
 
-                    return paginated
+                    return paginated, response.status
                 else:
                     error_text = await response.text()
                     logger.error(f"Failed to get courses. Status: {response.status}, Response: {error_text}")
-                    return None
+                    return None, response.status
         except Exception as e:
             logger.error(f"Error fetching courses: {e}", exc_info=True)
-            return None
+            return None, 0
 
     async def get_course_detail(
         self,
         access_token: str,
         course_id: int,
-    ) -> Optional[Course]:
+    ) -> tuple[Optional[Course], int]:
         """Получение детальной информации о конкретном курсе"""
         url = f"{self.base_url}/api/v1/courses/{course_id}/"
 
@@ -130,10 +153,10 @@ class BackendAPIClient:
             ) as response:
                 if response.status == 200:
                     data = await response.json()
-                    return Course.from_dict(data)
+                    return Course.from_dict(data), response.status
                 else:
                     logger.error(f"Failed to get course {course_id}: {response.status}")
-                    return None
+                    return None, response.status
         except Exception as e:
             logger.error(f"Error fetching course {course_id}: {e}")
-            return None
+            return None, 0

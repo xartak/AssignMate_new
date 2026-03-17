@@ -4,7 +4,6 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from config.settings import settings
-from database.db import init_db
 from handlers import start, courses
 from middlewares.auth import AuthMiddleware
 
@@ -18,10 +17,6 @@ logger = logging.getLogger(__name__)
 
 async def main():
     logger.info("Starting bot...")
-
-    # Инициализация БД
-    await init_db()
-    logger.info("Database initialized")
 
     # Создаем бота и диспетчер
     bot = Bot(token=settings.BOT_TOKEN)

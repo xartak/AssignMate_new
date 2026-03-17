@@ -1,5 +1,6 @@
 import { useEffect, useState, type ChangeEvent } from "react";
 import { fetchMe, updateMe, type MeResponse } from "@/features/auth/api";
+import { generateTelegramLink, type TelegramLinkResponse } from "@/features/telegram/api";
 import { resolveFileUrl } from "@/shared/api/base";
 import { useAsync } from "@/shared/hooks/useAsync";
 import { Loader } from "@/shared/ui/Loader";
@@ -13,6 +14,9 @@ export function CabinetPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [telegramLink, setTelegramLink] = useState<TelegramLinkResponse | null>(null);
+  const [telegramLoading, setTelegramLoading] = useState(false);
+  const [telegramError, setTelegramError] = useState<string | null>(null);
   const [formValues, setFormValues] = useState({
     first_name: "",
     last_name: "",
@@ -58,6 +62,13 @@ export function CabinetPage() {
 
   const avatarSrc = profile.avatar ? resolveFileUrl(profile.avatar) : defaultAvatar;
   const bio = profile.bio?.trim();
+  const telegramExpiresAt = telegramLink?.expires_at
+    ? new Date(telegramLink.expires_at)
+    : null;
+  const telegramExpiresLabel =
+    telegramExpiresAt && !Number.isNaN(telegramExpiresAt.getTime())
+      ? telegramExpiresAt.toLocaleString()
+      : telegramLink?.expires_at ?? "";
 
   const detailRows = [
     { label: "Почта", value: profile.email },
@@ -122,6 +133,23 @@ export function CabinetPage() {
       setSaveError(message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleGenerateTelegramLink = async () => {
+    setTelegramLoading(true);
+    setTelegramError(null);
+    try {
+      const link = await generateTelegramLink();
+      setTelegramLink(link);
+    } catch (err) {
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Не удалось получить ссылку для Telegram.";
+      setTelegramError(message);
+    } finally {
+      setTelegramLoading(false);
     }
   };
 
@@ -254,6 +282,40 @@ export function CabinetPage() {
               {bio ? <p>{bio}</p> : <span className="muted">Описание себя</span>}
             </div>
           )}
+          <div className="cabinet-telegram">
+            <div className="cabinet-card-header">
+              <h2>Telegram</h2>
+            </div>
+            <p className="muted">
+              Привяжите Telegram, чтобы получать уведомления и быстро входить через бота.
+            </p>
+            {telegramLink ? (
+              <div className="telegram-link">
+                <a href={telegramLink.link} target="_blank" rel="noreferrer">
+                  Открыть Telegram
+                </a>
+                <div className="telegram-meta">
+                  <span>Ссылка действительна до: {telegramExpiresLabel || "—"}</span>
+                  {telegramLink.note && <span>{telegramLink.note}</span>}
+                </div>
+              </div>
+            ) : (
+              <div className="telegram-placeholder">
+                <span className="muted">Ссылка ещё не создана.</span>
+              </div>
+            )}
+            {telegramError && <div className="auth-error">{telegramError}</div>}
+            <div className="form-actions end">
+              <button
+                className="auth-button"
+                type="button"
+                onClick={handleGenerateTelegramLink}
+                disabled={telegramLoading}
+              >
+                {telegramLoading ? "Создание..." : "Получить ссылку"}
+              </button>
+            </div>
+          </div>
         </section>
       </div>
     </div>

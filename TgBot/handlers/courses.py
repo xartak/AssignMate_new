@@ -6,11 +6,54 @@ import logging
 from config.settings import settings
 from services.api_client import BackendAPIClient
 from database.models import User
+from database.db import get_session
+from sqlalchemy import select
 from keyboards.inline import PaginationKeyboard
 from utils.formatters import format_empty_courses, format_course_message
 
 logger = logging.getLogger(__name__)
 router = Router()
+
+async def refresh_user_tokens(user: User) -> bool:
+    if not user or not user.refresh_token:
+        return False
+
+    async with BackendAPIClient(
+        base_url=settings.BACKEND_URL,
+        service_token=settings.BOT_SERVICE_TOKEN,
+    ) as client:
+        tokens = await client.refresh_token(user.refresh_token)
+
+    if not tokens or "access" not in tokens:
+        async with await get_session() as session:
+            result = await session.execute(select(User).where(User.id == user.id))
+            db_user = result.scalar_one_or_none()
+            if db_user:
+                db_user.is_authenticated = False
+                db_user.access_token = None
+                db_user.refresh_token = None
+                await session.commit()
+                user.is_authenticated = False
+                user.access_token = None
+                user.refresh_token = None
+        return False
+
+    async with await get_session() as session:
+        result = await session.execute(select(User).where(User.id == user.id))
+        db_user = result.scalar_one_or_none()
+        if not db_user:
+            return False
+
+        db_user.access_token = tokens["access"]
+        if tokens.get("refresh"):
+            db_user.refresh_token = tokens["refresh"]
+        db_user.is_authenticated = True
+        await session.commit()
+
+        user.access_token = db_user.access_token
+        user.refresh_token = db_user.refresh_token
+
+    return True
 
 
 @router.message(F.text == '📚 Курсы')
@@ -37,11 +80,19 @@ async def show_courses(
         base_url=settings.BACKEND_URL,
         service_token=settings.BOT_SERVICE_TOKEN,
     ) as client:
-        response = await client.get_courses(access_token=access_token)
+        response, status = await client.get_courses(access_token=access_token)
+
+        if status == 401 and await refresh_user_tokens(user):
+            response, status = await client.get_courses(access_token=user.access_token)
 
     await loading_msg.delete()
 
     if response is None:
+        if status == 401:
+            await message.answer(
+                text="❌ Токен устарел. Повторно привяжите аккаунт через /start.",
+            )
+            return
         await message.answer(
             text="❌ **Ошибка загрузки**\n\n"
             "Не удалось получить список курсов.\n"
@@ -121,12 +172,24 @@ async def handle_pagination(
         base_url=settings.BACKEND_URL,
         service_token=settings.BOT_SERVICE_TOKEN,
     ) as client:
-        response = await client.get_courses(
+        response, status = await client.get_courses(
             access_token=access_token,
             page_url=url_to_load,
         )
 
+        if status == 401 and await refresh_user_tokens(user):
+            response, status = await client.get_courses(
+                access_token=user.access_token,
+                page_url=url_to_load,
+            )
+
     if not response:
+        if status == 401:
+            await callback.message.edit_text(
+                text="❌ Токен устарел. Повторно привяжите аккаунт через /start.",
+                parse_mode="Markdown",
+            )
+            return
         await callback.message.edit_text(
             text="❌ Ошибка загрузки страницы",
             parse_mode="Markdown",
@@ -193,14 +256,25 @@ async def show_course_detail(
         base_url=settings.BACKEND_URL,
         service_token=settings.BOT_SERVICE_TOKEN,
     ) as client:
-        course = await client.get_course_detail(
+        course, status = await client.get_course_detail(
             access_token=access_token,
             course_id=course_id,
         )
 
+        if status == 401 and await refresh_user_tokens(user):
+            course, status = await client.get_course_detail(
+                access_token=user.access_token,
+                course_id=course_id,
+            )
+
     await loading_msg.delete()
 
     if not course:
+        if status == 401:
+            await message.answer(
+                text="❌ Токен устарел. Повторно привяжите аккаунт через /start.",
+            )
+            return
         await message.answer(
             text=f"❌ **Курс с ID {course_id} не найден**\n\n"
             "Проверьте правильность ID или список доступных курсов через /courses",
