@@ -1,6 +1,7 @@
 from rest_framework import permissions
 
-from courses.policies import CoursePolicy
+from courses.policies import CoursePolicy, is_course_staff
+from courses.choices import CourseStaffRole
 
 
 class CanViewCourseStats(permissions.BasePermission):
@@ -38,4 +39,9 @@ class CanViewCourseStats(permissions.BasePermission):
         Returns:
             bool: True, если доступ разрешен.
         """
-        return CoursePolicy.can_edit(request.user, obj)
+        user = request.user
+        return CoursePolicy.can_edit(user, obj) or is_course_staff(
+            user,
+            obj,
+            roles=[CourseStaffRole.TEACHER, CourseStaffRole.ASSISTANT],
+        )

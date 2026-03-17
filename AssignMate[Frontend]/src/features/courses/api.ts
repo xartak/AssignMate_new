@@ -24,6 +24,19 @@ export function createCourse(payload: { title: string; description: string }) {
   });
 }
 
+export function updateCourse(courseId: string, payload: { title?: string; description?: string }) {
+  return apiRequest<Course>(`/courses/${courseId}/`, {
+    method: "PATCH",
+    json: payload,
+  });
+}
+
+export function deleteCourse(courseId: string) {
+  return apiRequest(`/courses/${courseId}/`, {
+    method: "DELETE",
+  });
+}
+
 export function createLesson(
   courseId: string,
   payload: { title: string; description: string; materials?: File | null; duration?: number | null }
@@ -48,6 +61,38 @@ export function createLesson(
       description: payload.description,
       duration: payload.duration ?? null,
     },
+  });
+}
+
+export function updateLesson(
+  courseId: string,
+  order: number,
+  payload: { title?: string; description?: string; materials?: File | null; duration?: number | null }
+) {
+  if (payload.materials instanceof File) {
+    const form = new FormData();
+    if (payload.title !== undefined) form.append("title", payload.title);
+    if (payload.description !== undefined) form.append("description", payload.description);
+    if (typeof payload.duration === "number") {
+      form.append("duration", String(payload.duration));
+    }
+    form.append("materials", payload.materials);
+    return apiUpload<Lesson>(`/courses/${courseId}/lessons/${order}/`, form, "PATCH");
+  }
+
+  return apiRequest<Lesson>(`/courses/${courseId}/lessons/${order}/`, {
+    method: "PATCH",
+    json: {
+      title: payload.title,
+      description: payload.description,
+      duration: payload.duration ?? null,
+    },
+  });
+}
+
+export function deleteLesson(courseId: string, order: number) {
+  return apiRequest(`/courses/${courseId}/lessons/${order}/`, {
+    method: "DELETE",
   });
 }
 

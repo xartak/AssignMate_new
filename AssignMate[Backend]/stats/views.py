@@ -37,12 +37,14 @@ def _course_queryset_for_user(user):
 
 def _lesson_queryset_for_user(user):
     """Возвращает queryset уроков с учетом роли пользователя."""
-    return Lesson.all_objects if getattr(user, "is_admin", False) else Lesson.objects
+    base = Lesson.all_objects if getattr(user, "is_admin", False) else Lesson.objects
+    return base.filter(deleted__isnull=True)
 
 
 def _assignment_queryset_for_user(user):
     """Возвращает queryset заданий с учетом роли пользователя."""
-    return Assignment.all_objects if getattr(user, "is_admin", False) else Assignment.objects
+    base = Assignment.all_objects if getattr(user, "is_admin", False) else Assignment.objects
+    return base.filter(deleted__isnull=True)
 
 
 class CourseStatsListView(ListAPIView):

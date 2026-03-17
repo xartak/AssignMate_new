@@ -1,6 +1,13 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { createLesson, fetchCourse, fetchInviteCode, fetchLessons } from "@/features/courses/api";
+import {
+  createLesson,
+  deleteCourse,
+  fetchCourse,
+  fetchInviteCode,
+  fetchLessons,
+  updateCourse,
+} from "@/features/courses/api";
 import { useAsync } from "@/shared/hooks/useAsync";
 import { Loader } from "@/shared/ui/Loader";
 import { ErrorState } from "@/shared/ui/ErrorState";
@@ -8,13 +15,21 @@ import { EmptyState } from "@/shared/ui/EmptyState";
 import type { ApiError } from "@/shared/api/base";
 import { useAuth } from "@/shared/hooks/useAuth";
 import { NumberInput } from "@/shared/ui/NumberInput";
+import type { Course } from "@/shared/api/types";
 
 export function CourseDetailPage() {
   const { courseId = "" } = useParams();
-  const { role } = useAuth();
+  const navigate = useNavigate();
+  const { role, userId } = useAuth();
   const [reloadKey, setReloadKey] = useState(0);
   const courseState = useAsync(() => fetchCourse(courseId), [courseId]);
   const lessonsState = useAsync(() => fetchLessons(courseId), [courseId, reloadKey]);
+  const [courseData, setCourseData] = useState<Course | null>(null);
+  const [isEditingCourse, setIsEditingCourse] = useState(false);
+  const [courseTitle, setCourseTitle] = useState("");
+  const [courseDescription, setCourseDescription] = useState("");
+  const [courseSaving, setCourseSaving] = useState(false);
+  const [courseError, setCourseError] = useState<string | null>(null);
   const [showCreateLesson, setShowCreateLesson] = useState(false);
   const [lessonTitle, setLessonTitle] = useState("");
   const [lessonDescription, setLessonDescription] = useState("");
@@ -32,6 +47,13 @@ export function CourseDetailPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!courseState.data) return;
+    setCourseData(courseState.data);
+    setCourseTitle(courseState.data.title ?? "");
+    setCourseDescription(courseState.data.description ?? "");
+  }, [courseState.data]);
+
   if (courseState.loading || lessonsState.loading) return <Loader />;
   if (courseState.error) {
     const apiError = courseState.error as ApiError;
@@ -47,9 +69,12 @@ export function CourseDetailPage() {
     }
     return <ErrorState error={courseState.error} />;
   }
-  if (!courseState.data) return <EmptyState label="Курс не найден" />;
+  if (!courseData) return <EmptyState label="Курс не найден" />;
 
-  const isTeacher = role === "teacher";
+  const isAdmin = role === "admin";
+  const isAuthor = courseData.author === userId;
+  const canManageCourse = isAdmin || isAuthor;
+  const canManageLessons = canManageCourse;
 
   const handleCreateLesson = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -87,21 +112,108 @@ export function CourseDetailPage() {
     }
   };
 
+  const handleCourseUpdate = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setCourseSaving(true);
+    setCourseError(null);
+    try {
+      const updated = await updateCourse(courseId, {
+        title: courseTitle,
+        description: courseDescription,
+      });
+      setCourseData(updated);
+      setIsEditingCourse(false);
+    } catch {
+      setCourseError("Не удалось обновить курс");
+    } finally {
+      setCourseSaving(false);
+    }
+  };
+
+  const handleCourseDelete = async () => {
+    const confirmed = window.confirm("Удалить курс? Это действие нельзя отменить.");
+    if (!confirmed) return;
+    setCourseSaving(true);
+    setCourseError(null);
+    try {
+      await deleteCourse(courseId);
+      navigate("/courses");
+    } catch {
+      setCourseError("Не удалось удалить курс");
+    } finally {
+      setCourseSaving(false);
+    }
+  };
+
 
   return (
     <div className="courses-page">
       <div className="page-header">
         <div>
-          <h1>{courseState.data.title}</h1>
-          <p>{courseState.data.description || "Описание отсутствует"}</p>
+          <h1>{courseData.title}</h1>
+          <p>{courseData.description || "Описание отсутствует"}</p>
         </div>
-        {isTeacher && (
+        {canManageCourse && (
+          <div className="row">
+            <button className="secondary" onClick={() => setIsEditingCourse((prev) => !prev)}>
+              {isEditingCourse ? "Скрыть форму" : "Редактировать"}
+            </button>
+            <button className="danger" onClick={handleCourseDelete} disabled={courseSaving}>
+              Удалить курс
+            </button>
+          </div>
+        )}
+      </div>
+      {courseError && <div className="auth-error">{courseError}</div>}
+
+      {canManageCourse && isEditingCourse && (
+        <div className="courses-hero">
+          <h3>Редактировать курс</h3>
+          <form className="auth-form" onSubmit={handleCourseUpdate}>
+            <div>
+              <label htmlFor="courseEditTitle">Название</label>
+              <input
+                id="courseEditTitle"
+                className="auth-input"
+                value={courseTitle}
+                onChange={(event) => setCourseTitle(event.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="courseEditDesc">Описание</label>
+              <textarea
+                id="courseEditDesc"
+                className="auth-input"
+                rows={3}
+                value={courseDescription}
+                onChange={(event) => setCourseDescription(event.target.value)}
+                required
+              />
+            </div>
+            {courseError && <div className="auth-error">{courseError}</div>}
+            <div className="form-actions end">
+              <button className="auth-button" type="submit" disabled={courseSaving}>
+                {courseSaving ? "Сохраняем..." : "Сохранить"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {canManageLessons && (
+        <div className="page-header compact">
+          <div>
+            <h2>Уроки</h2>
+            <p>Управление уроками курса.</p>
+          </div>
           <button className="auth-button" onClick={() => setShowCreateLesson((prev) => !prev)}>
             {showCreateLesson ? "Скрыть форму" : "Добавить урок"}
           </button>
-        )}
-      </div>
-      {isTeacher && showCreateLesson && (
+        </div>
+      )}
+
+      {canManageLessons && showCreateLesson && (
         <div className="courses-hero">
           <h3>Создать урок</h3>
           <form className="auth-form" onSubmit={handleCreateLesson}>
@@ -154,7 +266,7 @@ export function CourseDetailPage() {
           </form>
         </div>
       )}
-      {isTeacher && (
+      {canManageLessons && (
         <div className="courses-hero">
           <h3>Код приглашения</h3>
           <div className="row">
@@ -167,7 +279,7 @@ export function CourseDetailPage() {
         </div>
       )}
       <div className="stack">
-        <h3>Уроки</h3>
+        {!canManageLessons && <h3>Уроки</h3>}
         {lessonsState.error ? (
           (() => {
             const apiError = lessonsState.error as ApiError;

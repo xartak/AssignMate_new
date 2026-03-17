@@ -1,7 +1,7 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { fetchLesson, fetchHomeworks } from "@/features/lessons/api";
-import { fetchLessons } from "@/features/courses/api";
+import { deleteLesson, fetchCourse, fetchLessons, updateLesson } from "@/features/courses/api";
 import { useAsync } from "@/shared/hooks/useAsync";
 import { Loader } from "@/shared/ui/Loader";
 import { ErrorState } from "@/shared/ui/ErrorState";
@@ -13,6 +13,8 @@ import type { ApiError } from "@/shared/api/base";
 import { resolveFileUrl } from "@/shared/api/base";
 import { useAuth } from "@/shared/hooks/useAuth";
 import { NumberInput } from "@/shared/ui/NumberInput";
+import { formatDateTime } from "@/shared/utils/date";
+import type { Lesson } from "@/shared/api/types";
 
 type OptionDraft = {
   text: string;
@@ -25,11 +27,21 @@ type BlankDraft = {
 
 export function LessonDetailPage() {
   const { courseId = "", lessonOrder = "" } = useParams();
-  const { role } = useAuth();
+  const navigate = useNavigate();
+  const { role, userId } = useAuth();
   const [reloadKey, setReloadKey] = useState(0);
   const lessonState = useAsync(() => fetchLesson(courseId, lessonOrder), [courseId, lessonOrder]);
   const homeworksState = useAsync(() => fetchHomeworks(courseId, lessonOrder), [courseId, lessonOrder, reloadKey]);
   const lessonsNavState = useAsync(() => fetchLessons(courseId), [courseId]);
+  const courseState = useAsync(() => fetchCourse(courseId), [courseId]);
+  const [lessonData, setLessonData] = useState<Lesson | null>(null);
+  const [isEditingLesson, setIsEditingLesson] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editDuration, setEditDuration] = useState("");
+  const [editMaterials, setEditMaterials] = useState<File | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
   const [showCreateHomework, setShowCreateHomework] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -56,13 +68,27 @@ export function LessonDetailPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!lessonState.data) return;
+    setLessonData(lessonState.data);
+    setEditTitle(lessonState.data.title ?? "");
+    setEditDescription(lessonState.data.description ?? "");
+    setEditDuration(
+      lessonState.data.duration !== null && lessonState.data.duration !== undefined
+        ? String(lessonState.data.duration)
+        : ""
+    );
+  }, [lessonState.data]);
+
   if (lessonState.loading || homeworksState.loading || lessonsNavState.loading) {
     return <Loader />;
   }
   if (lessonState.error) return <ErrorState error={lessonState.error} />;
-  if (!lessonState.data) return <EmptyState label="Урок не найден" />;
+  if (!lessonData) return <EmptyState label="Урок не найден" />;
 
-  const isTeacher = role === "teacher";
+  const isAdmin = role === "admin";
+  const isAuthor = courseState.data?.author === userId;
+  const canManageLesson = isAdmin || (role === "teacher" && isAuthor);
   const lessonsList = lessonsNavState.data ?? [];
   const currentOrder = Number(lessonOrder);
   const currentIndex = lessonsList.findIndex((lesson) => lesson.order === currentOrder);
@@ -210,19 +236,61 @@ export function LessonDetailPage() {
     }
   };
 
+  const handleLessonUpdate = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const updated = await updateLesson(courseId, Number(lessonOrder), {
+        title: editTitle,
+        description: editDescription,
+        duration: editDuration ? Number(editDuration) : null,
+        materials: editMaterials || undefined,
+      });
+      setLessonData(updated);
+      setIsEditingLesson(false);
+      setEditMaterials(null);
+    } catch {
+      setEditError("Не удалось обновить урок");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleLessonDelete = async () => {
+    const confirmed = window.confirm("Удалить урок? Это действие нельзя отменить.");
+    if (!confirmed) return;
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      await deleteLesson(courseId, Number(lessonOrder));
+      navigate(`/courses/${courseId}`);
+    } catch {
+      setEditError("Не удалось удалить урок");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   return (
     <div className="courses-page">
       <div className="page-header">
         <div>
-          <h1>{lessonState.data.order}. {lessonState.data.title}</h1>
-          <p>{lessonState.data.description || "Описание отсутствует"}</p>
+          <h1>{lessonData.order}. {lessonData.title}</h1>
+          <p>{lessonData.description || "Описание отсутствует"}</p>
         </div>
-        {isTeacher && (
-          <button className="auth-button" onClick={() => setShowCreateHomework((prev) => !prev)}>
-            {showCreateHomework ? "Скрыть форму" : "Добавить ДЗ"}
-          </button>
+        {canManageLesson && (
+          <div className="row">
+            <button className="secondary" onClick={() => setIsEditingLesson((prev) => !prev)}>
+              {isEditingLesson ? "Скрыть форму" : "Редактировать"}
+            </button>
+            <button className="danger" onClick={handleLessonDelete} disabled={editSaving}>
+              Удалить урок
+            </button>
+          </div>
         )}
       </div>
+      {editError && <div className="auth-error">{editError}</div>}
       <div className="courses-hero page-nav">
         <div className="nav-actions">
           {prevLesson ? (
@@ -257,15 +325,78 @@ export function LessonDetailPage() {
           )}
         </div>
       </div>
-      {lessonState.data.materials && (
+      {lessonData.materials && (
         <div className="courses-hero">
           <h3>Материалы урока</h3>
-          <a className="submission-file" href={resolveFileUrl(lessonState.data.materials)} target="_blank" rel="noreferrer">
+          <a className="submission-file" href={resolveFileUrl(lessonData.materials)} target="_blank" rel="noreferrer">
             Скачать материалы
           </a>
         </div>
       )}
-      {isTeacher && showCreateHomework && (
+      {canManageLesson && isEditingLesson && (
+        <div className="courses-hero">
+          <h3>Редактировать урок</h3>
+          <form className="auth-form" onSubmit={handleLessonUpdate}>
+            <div>
+              <label htmlFor="lessonEditTitle">Название</label>
+              <input
+                id="lessonEditTitle"
+                className="auth-input"
+                value={editTitle}
+                onChange={(event) => setEditTitle(event.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="lessonEditDescription">Описание</label>
+              <textarea
+                id="lessonEditDescription"
+                className="auth-input"
+                rows={3}
+                value={editDescription}
+                onChange={(event) => setEditDescription(event.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="lessonEditMaterials">Материалы</label>
+              <input
+                id="lessonEditMaterials"
+                className="auth-input"
+                type="file"
+                onChange={(event) => setEditMaterials(event.target.files?.[0] ?? null)}
+              />
+              {editMaterials && <div className="muted">Файл: {editMaterials.name}</div>}
+            </div>
+            <div>
+              <label htmlFor="lessonEditDuration">Длительность (минуты)</label>
+              <NumberInput
+                id="lessonEditDuration"
+                min={0}
+                value={editDuration}
+                onChange={setEditDuration}
+              />
+            </div>
+            {editError && <div className="auth-error">{editError}</div>}
+            <div className="form-actions end">
+              <button className="auth-button" type="submit" disabled={editSaving}>
+                {editSaving ? "Сохраняем..." : "Сохранить"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+      {canManageLesson && (
+        <div className="page-header compact">
+          <div>
+            <h2>Домашние задания</h2>
+            <p>Управление заданиями урока.</p>
+          </div>
+          <button className="auth-button" onClick={() => setShowCreateHomework((prev) => !prev)}>
+            {showCreateHomework ? "Скрыть форму" : "Добавить ДЗ"}
+          </button>
+        </div>
+      )}
+      {canManageLesson && showCreateHomework && (
         <div className="courses-hero">
           <h3>Создать домашнее задание</h3>
           <form className="auth-form" onSubmit={handleCreateHomework}>
@@ -517,7 +648,7 @@ export function LessonDetailPage() {
         </div>
       )}
       <div className="stack">
-        <h3>Домашние задания</h3>
+        {!canManageLesson && <h3>Домашние задания</h3>}
         {homeworksState.error && <ErrorState error={homeworksState.error} />}
         {!homeworksState.data || homeworksState.data.length === 0 ? (
           <EmptyState label="Домашние задания пока не добавлены" />
@@ -537,7 +668,7 @@ export function LessonDetailPage() {
                 <div className="meta-row">
                   <span className="meta-pill">Максимальный балл: {homework.max_score}</span>
                   {homework.deadline && (
-                    <span className="meta-pill">Дедлайн: {new Date(homework.deadline).toLocaleString()}</span>
+                    <span className="meta-pill">Дедлайн: {formatDateTime(homework.deadline)}</span>
                   )}
                 </div>
               </Link>

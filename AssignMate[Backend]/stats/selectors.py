@@ -60,10 +60,16 @@ def course_detail_stats(course):
         course=course,
         status=EnrollmentStatus.ACTIVE,
     ).count()
-    lessons_count = Lesson.objects.filter(course=course).count()
-    homeworks_count = Assignment.objects.filter(lesson__course=course).count()
+    lessons_count = Lesson.objects.filter(course=course, deleted__isnull=True).count()
+    homeworks_count = Assignment.objects.filter(
+        lesson__course=course,
+        deleted__isnull=True,
+    ).count()
     total_max_score = (
-        Assignment.objects.filter(lesson__course=course)
+        Assignment.objects.filter(
+            lesson__course=course,
+            deleted__isnull=True,
+        )
         .aggregate(total=Coalesce(Sum("max_score"), 0))
         .get("total")
     )
@@ -93,10 +99,19 @@ def lesson_list_stats(course):
     ).count()
 
     lessons = (
-        Lesson.objects.filter(course=course)
+        Lesson.objects.filter(course=course, deleted__isnull=True)
         .annotate(
-            homeworks_max_score_sum=Coalesce(Sum("assignments__max_score"), 0),
-            score_sum=Coalesce(Sum("assignments__submissions__review__score"), 0),
+            homeworks_max_score_sum=Coalesce(
+                Sum("assignments__max_score", filter=Q(assignments__deleted__isnull=True)),
+                0,
+            ),
+            score_sum=Coalesce(
+                Sum(
+                    "assignments__submissions__review__score",
+                    filter=Q(assignments__deleted__isnull=True),
+                ),
+                0,
+            ),
         )
         .order_by("order")
     )
@@ -131,14 +146,17 @@ def lesson_detail_stats(course, lesson):
         course=course,
         status=EnrollmentStatus.ACTIVE,
     ).count()
-    homeworks_count = Assignment.objects.filter(lesson=lesson).count()
+    homeworks_count = Assignment.objects.filter(lesson=lesson, deleted__isnull=True).count()
     total_max_score = (
-        Assignment.objects.filter(lesson=lesson)
+        Assignment.objects.filter(lesson=lesson, deleted__isnull=True)
         .aggregate(total=Coalesce(Sum("max_score"), 0))
         .get("total")
     )
 
-    submissions = Submission.objects.filter(assignment__lesson=lesson)
+    submissions = Submission.objects.filter(
+        assignment__lesson=lesson,
+        assignment__deleted__isnull=True,
+    )
     submissions_stats = submissions.aggregate(
         submissions_count=Count("id"),
         reviewed_count=Count("review", filter=Q(review__isnull=False)),
@@ -191,7 +209,7 @@ def homework_list_stats(course):
     ).count()
 
     homeworks = (
-        Assignment.objects.filter(lesson__course=course)
+        Assignment.objects.filter(lesson__course=course, deleted__isnull=True)
         .annotate(
             score_sum=Coalesce(Sum("submissions__review__score"), 0),
             submissions_count=Count("submissions", distinct=True),
@@ -233,7 +251,10 @@ def homework_detail_stats(course, homework):
         status=EnrollmentStatus.ACTIVE,
     ).count()
 
-    submissions = Submission.objects.filter(assignment=homework).select_related(
+    submissions = Submission.objects.filter(
+        assignment=homework,
+        assignment__deleted__isnull=True,
+    ).select_related(
         "student",
         "review",
     )
@@ -301,9 +322,15 @@ def course_students_stats(course):
     Returns:
         list[dict]: Список статистики по студентам.
     """
-    homeworks_count = Assignment.objects.filter(lesson__course=course).count()
+    homeworks_count = Assignment.objects.filter(
+        lesson__course=course,
+        deleted__isnull=True,
+    ).count()
     total_max_score = (
-        Assignment.objects.filter(lesson__course=course)
+        Assignment.objects.filter(
+            lesson__course=course,
+            deleted__isnull=True,
+        )
         .aggregate(total=Coalesce(Sum("max_score"), 0))
         .get("total")
     )
@@ -372,7 +399,11 @@ def course_student_detail_stats(course, student):
         dict: Детальная статистика по студенту.
     """
     homeworks = (
-        Assignment.objects.filter(lesson__course=course)
+        Assignment.objects.filter(
+            lesson__course=course,
+            lesson__deleted__isnull=True,
+            deleted__isnull=True,
+        )
         .select_related("lesson")
         .order_by("lesson__order", "order")
     )
@@ -380,7 +411,11 @@ def course_student_detail_stats(course, student):
     total_max_score = homeworks.aggregate(total=Coalesce(Sum("max_score"), 0)).get("total")
 
     submissions = (
-        Submission.objects.filter(student=student, assignment__lesson__course=course)
+        Submission.objects.filter(
+            student=student,
+            assignment__lesson__course=course,
+            assignment__deleted__isnull=True,
+        )
         .select_related("review", "assignment", "assignment__lesson")
     )
     submissions_count = submissions.count()

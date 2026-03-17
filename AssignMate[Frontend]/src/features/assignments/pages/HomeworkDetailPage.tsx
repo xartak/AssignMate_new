@@ -25,6 +25,7 @@ import { FillBlankForm } from "@/features/assignments/forms/FillBlankForm";
 import { ShortAnswerForm } from "@/features/assignments/forms/ShortAnswerForm";
 import { LongAnswerForm } from "@/features/assignments/forms/LongAnswerForm";
 import { useAuth } from "@/shared/hooks/useAuth";
+import { formatDateTime } from "@/shared/utils/date";
 
 const REVIEW_STATUS_LABELS: Record<string, string> = {
   PENDING: "На проверке",
@@ -436,7 +437,7 @@ export function HomeworkDetailPage() {
                 new Date(homeworkState.data.deadline).getTime() < Date.now() ? "danger" : ""
               }`}
             >
-              Дедлайн: {new Date(homeworkState.data.deadline).toLocaleString()}
+              Дедлайн: {formatDateTime(homeworkState.data.deadline)}
             </span>
           )}
         </div>

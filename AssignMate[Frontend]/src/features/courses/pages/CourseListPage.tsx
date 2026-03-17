@@ -33,7 +33,7 @@ export function CourseListPage() {
       ? "Все доступные курсы."
       : "Курсы, к которым у вас есть доступ.";
   const isStudent = role === "student";
-  const isTeacher = role === "teacher";
+  const canCreateCourse = role === "teacher" || role === "admin";
   const courses = useMemo(() => data ?? [], [data]);
 
   const handleJoin = async (event: React.FormEvent) => {
@@ -76,13 +76,13 @@ export function CourseListPage() {
           <h1>Мои курсы</h1>
           <p>{pageDescription}</p>
         </div>
-        {isTeacher && (
+        {canCreateCourse && (
           <button className="auth-button" onClick={() => setShowCreate((prev) => !prev)}>
             {showCreate ? "Скрыть форму" : "Добавить курс"}
           </button>
         )}
       </div>
-      {isTeacher && showCreate && (
+      {canCreateCourse && showCreate && (
         <div className="courses-hero">
           <h3>Создать курс</h3>
           <form className="auth-form" onSubmit={handleCreate}>

@@ -4,7 +4,8 @@ import { useAuth } from "@/shared/hooks/useAuth";
 
 export function RequireTeacher({ children }: { children: ReactNode }) {
   const { role } = useAuth();
-  if (role !== "teacher") {
+  const allowedRoles = new Set(["teacher", "admin", "assistant"]);
+  if (!role || !allowedRoles.has(role)) {
     return <Navigate to="/courses" replace />;
   }
   return <>{children}</>;

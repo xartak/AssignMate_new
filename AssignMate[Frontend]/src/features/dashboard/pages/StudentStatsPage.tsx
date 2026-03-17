@@ -5,6 +5,7 @@ import { useAsync } from "@/shared/hooks/useAsync";
 import { Loader } from "@/shared/ui/Loader";
 import { ErrorState } from "@/shared/ui/ErrorState";
 import { EmptyState } from "@/shared/ui/EmptyState";
+import { formatDateTime } from "@/shared/utils/date";
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "На проверке",
@@ -42,7 +43,7 @@ export function StudentStatsPage() {
 
   const formatDeadline = (deadline: string | null) => {
     if (!deadline) return "Без дедлайна";
-    return new Date(deadline).toLocaleString();
+    return formatDateTime(deadline);
   };
 
   const formatStatus = (status: string) => STATUS_LABELS[status] ?? status;

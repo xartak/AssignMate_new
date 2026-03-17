@@ -102,6 +102,7 @@ function buildCrumbs(pathname: string): Crumb[] {
 
 export function AppLayout() {
   const { role, logout } = useAuth();
+  const canViewDashboard = role === "teacher" || role === "admin" || role === "assistant";
   const location = useLocation();
   const crumbs = buildCrumbs(location.pathname);
 
@@ -115,7 +116,7 @@ export function AppLayout() {
           <div>
             <Link to="/courses">Мои курсы</Link>
             <Link to="/cabinet">Личный кабинет</Link>
-            {role === "teacher" && <Link to="/dashboard">Dashboard</Link>}
+            {canViewDashboard && <Link to="/dashboard">Dashboard</Link>}
             <button className="secondary" onClick={logout}>
               Выйти
             </button>

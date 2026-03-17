@@ -41,7 +41,6 @@ class Lesson(OrderedWithinParentMixin, TimeStampedModel, SoftDeleteModel):
 
     class Meta:
         """Метаданные модели урока."""
-        unique_together = ("course", "order")
         ordering = ["order"]
         verbose_name = "Lesson"
         verbose_name_plural = "Lessons"
