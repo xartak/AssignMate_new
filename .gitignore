@@ -32,3 +32,6 @@ AssignMate[[]Backend[]]/.env
 
 # Docker
 /DockerVolumes/
+
+# All
+.env

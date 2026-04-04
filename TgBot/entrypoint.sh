@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-if [ -z "${DATABASE_URL:-}" ]; then
+if [ -z "${TG_BOT_DATABASE_URL:-}" ]; then
   echo "DATABASE_URL is required"
   exit 1
 fi
@@ -13,7 +13,7 @@ import os
 
 import asyncpg
 
-dsn = os.environ["DATABASE_URL"]
+dsn = os.environ["TG_BOT_DATABASE_URL"]
 if "+asyncpg" in dsn:
     dsn = dsn.replace("+asyncpg", "")
 

@@ -2,13 +2,13 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: assignmate
-      POSTGRES_USER: assignmate
-      POSTGRES_PASSWORD: assignmate
+      POSTGRES_DB: ${BACKEND_DATABASE_NAME}
+      POSTGRES_USER: ${BACKEND_DATABASE_USER}
+      POSTGRES_PASSWORD: ${BACKEND_DATABASE_PASSWORD}
     volumes:
       - ./DockerVolumes/db-data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${BACKEND_DATABASE_PORT}:5432"
 
   backend:
     build:
@@ -16,7 +16,7 @@ services:
       dockerfile: Dockerfile
       target: dev
     env_file:
-      - ./AssignMate[Backend]/.env
+      - .env
     volumes:
       - ./AssignMate[Backend]:/app
       - ./DockerVolumes/static:/app/static
@@ -32,9 +32,9 @@ services:
       dockerfile: Dockerfile
       target: dev
       args:
-        VITE_API_URL: ${VITE_API_URL}
+        VITE_API_URL: ${FRONTEND_VITE_API_URL}
     env_file:
-      - ./AssignMate[Frontend]/.env
+      - .env
     environment:
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
@@ -47,13 +47,13 @@ services:
   tg_bot_db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: assignmate_db
-      POSTGRES_USER: assignmate_db
-      POSTGRES_PASSWORD: assignmate_db
+      POSTGRES_DB: ${TG_BOT_DATABASE_NAME}
+      POSTGRES_USER: ${TG_BOT_DATABASE_USER}
+      POSTGRES_PASSWORD: ${TG_BOT_DATABASE_PASSWORD}
     volumes:
       - ./DockerVolumes/tg-bot-db-data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "${TG_BOT_DATABASE_PORT}:5432"
 
 
   tg_bot:
@@ -61,7 +61,7 @@ services:
       context: ./TgBot
       dockerfile: Dockerfile
     env_file:
-      - ./TgBot/.env
+      - .env
     depends_on:
       - tg_bot_db
       - backend
