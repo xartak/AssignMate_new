@@ -8,7 +8,7 @@ services:
     volumes:
       - ./DockerVolumes/db-data:/var/lib/postgresql/data
     ports:
-      - "${BACKEND_DATABASE_PORT}:5432"
+      - "${BACKEND_DATABASE_EXTERNAL_PORT}:${BACKEND_DATABASE_PORT}"
 
   backend:
     build:
@@ -32,7 +32,7 @@ services:
       dockerfile: Dockerfile
       target: dev
       args:
-        VITE_API_URL: ${FRONTEND_VITE_API_URL}
+        VITE_API_URL: ${VITE_API_URL}
     env_file:
       - .env
     environment:
@@ -53,7 +53,7 @@ services:
     volumes:
       - ./DockerVolumes/tg-bot-db-data:/var/lib/postgresql/data
     ports:
-      - "${TG_BOT_DATABASE_PORT}:5432"
+      - "${TG_BOT_DATABASE_EXTERNAL_PORT}:${TG_BOT_DATABASE_PORT}"
 
 
   tg_bot:

@@ -1,6 +1,7 @@
-from functools import lru_cache
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, AsyncEngine
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -40,6 +41,7 @@ AsyncSessionLocal = sessionmaker(
 )
 
 
-async def get_session() -> AsyncSession:
-    async with AsyncSessionLocal as session:
-        return session
+@asynccontextmanager
+async def get_session() -> AsyncIterator[AsyncSession]:
+    async with AsyncSessionLocal() as session:
+        yield session

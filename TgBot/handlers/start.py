@@ -28,7 +28,7 @@ async def start_command(
     args = command.args
 
     # Проверяем, авторизован ли уже пользователь
-    async with await get_session() as session:
+    async with get_session() as session:
         from sqlalchemy import select
         result = await session.execute(
             select(User).where(User.telegram_id == telegram_id)
@@ -63,7 +63,7 @@ async def start_command(
 
         if result and result.get('success'):
             # Сохраняем пользователя в локальную БД
-            async with await get_session() as session:
+            async with get_session() as session:
                 new_user = User(
                     telegram_id=telegram_id,
                     telegram_username=username,

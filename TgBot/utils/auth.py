@@ -21,7 +21,7 @@ async def refresh_user_tokens(user: User) -> bool:
         tokens = await client.refresh_token(user.refresh_token)
 
     if not tokens or "access" not in tokens:
-        async with await get_session() as session:
+        async with get_session() as session:
             result = await session.execute(select(User).where(User.id == user.id))
             db_user = result.scalar_one_or_none()
             if db_user:
@@ -34,7 +34,7 @@ async def refresh_user_tokens(user: User) -> bool:
                 user.refresh_token = None
         return False
 
-    async with await get_session() as session:
+    async with get_session() as session:
         result = await session.execute(select(User).where(User.id == user.id))
         db_user = result.scalar_one_or_none()
         if not db_user:

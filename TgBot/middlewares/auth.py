@@ -28,7 +28,7 @@ class AuthMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         # Ищем пользователя в БД
-        async with await get_session() as session:
+        async with get_session() as session:
             result = await session.execute(
                 select(User).where(User.telegram_id == telegram_id)
             )
