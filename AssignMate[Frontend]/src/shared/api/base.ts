@@ -21,10 +21,12 @@ function getToken(): string | null {
 function buildHeaders(isJson: boolean, extra?: HeadersInit): HeadersInit {
   const headers: HeadersInit = { ...extra };
   if (isJson) {
+    // @ts-ignore
     headers["Content-Type"] = "application/json";
   }
   const token = getToken();
   if (token) {
+    // @ts-ignore
     headers["Authorization"] = `Bearer ${token}`;
   }
   return headers;
@@ -127,6 +129,7 @@ export async function fetchAllPages<T>(path: string): Promise<T[]> {
     if (guard > 50) {
       break;
     }
+    // @ts-ignore
     const data = await apiRequest<PaginatedResponse<T> | T[]>(url);
     if (Array.isArray(data)) {
       return data;
