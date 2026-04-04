@@ -42,6 +42,7 @@ export type MeResponse = {
   bio?: string | null;
   contact_method?: string | null;
   role: string;
+  telegram_connected?: boolean;
 };
 
 export function login(payload: LoginPayload) {

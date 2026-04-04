@@ -503,6 +503,11 @@ body.theme-purple nav button.secondary {
   font-size: 12px;
 }
 
+.telegram-status {
+  color: #1e7b57;
+  font-weight: 600;
+}
+
 .telegram-meta {
   display: grid;
   gap: 4px;

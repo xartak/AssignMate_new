@@ -73,6 +73,7 @@ export function CabinetPage() {
   const telegramButtonClass = telegramLink
     ? "auth-button telegram-button active"
     : "auth-button telegram-button";
+  const isTelegramConnected = Boolean(profile.telegram_connected);
 
   const detailRows = [
     { label: "Почта", value: profile.email },
@@ -174,20 +175,26 @@ export function CabinetPage() {
         </div>
           <div className="cabinet-telegram">
             <div className="cabinet-telegram-title">Telegram</div>
-            {telegramError && <div className="auth-error">{telegramError}</div>}
-            <div className="form-actions end">
-              <button
-                className={telegramButtonClass}
-                type="button"
-                onClick={handleTelegramAction}
-                disabled={telegramLoading}
-              >
-                {telegramLoading ? "Создание..." : telegramButtonLabel}
-              </button>
-            </div>
-            <p className="muted">
-              Привяжите Telegram, чтобы получать уведомления и просматривать курсы.
-            </p>
+            {!isTelegramConnected && telegramError && <div className="auth-error">{telegramError}</div>}
+            {!isTelegramConnected && (
+              <div className="form-actions end">
+                <button
+                  className={telegramButtonClass}
+                  type="button"
+                  onClick={handleTelegramAction}
+                  disabled={telegramLoading}
+                >
+                  {telegramLoading ? "Создание..." : telegramButtonLabel}
+                </button>
+              </div>
+            )}
+            {isTelegramConnected ? (
+              <p className="telegram-status">Telegram привязан</p>
+            ) : (
+              <p className="muted">
+                Привяжите Telegram, чтобы получать уведомления и просматривать курсы.
+              </p>
+            )}
           </div>
       </div>
 
