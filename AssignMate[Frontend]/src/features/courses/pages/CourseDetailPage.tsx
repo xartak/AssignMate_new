@@ -16,6 +16,10 @@ import type { ApiError } from "@/shared/api/base";
 import { useAuth } from "@/shared/hooks/useAuth";
 import { NumberInput } from "@/shared/ui/NumberInput";
 import type { Course } from "@/shared/api/types";
+import {
+  LESSON_MATERIAL_ACCEPT,
+  validateLessonMaterials,
+} from "@/shared/constants/lessonMaterials";
 
 export function CourseDetailPage() {
   const { courseId = "" } = useParams();
@@ -33,7 +37,8 @@ export function CourseDetailPage() {
   const [showCreateLesson, setShowCreateLesson] = useState(false);
   const [lessonTitle, setLessonTitle] = useState("");
   const [lessonDescription, setLessonDescription] = useState("");
-  const [lessonMaterials, setLessonMaterials] = useState<File | null>(null);
+  const [lessonMaterials, setLessonMaterials] = useState<File[]>([]);
+  const [lessonMaterialsError, setLessonMaterialsError] = useState<string | null>(null);
   const [lessonDuration, setLessonDuration] = useState("");
   const [lessonError, setLessonError] = useState<string | null>(null);
   const [lessonSaving, setLessonSaving] = useState(false);
@@ -78,25 +83,57 @@ export function CourseDetailPage() {
 
   const handleCreateLesson = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (lessonMaterialsError) {
+      setLessonError(lessonMaterialsError);
+      return;
+    }
     setLessonSaving(true);
     setLessonError(null);
     try {
       await createLesson(courseId, {
         title: lessonTitle,
         description: lessonDescription,
-        materials: lessonMaterials || undefined,
+        materials: lessonMaterials.length > 0 ? lessonMaterials : undefined,
         duration: lessonDuration ? Number(lessonDuration) : null,
       });
       setLessonTitle("");
       setLessonDescription("");
-      setLessonMaterials(null);
+      setLessonMaterials([]);
+      setLessonMaterialsError(null);
       setLessonDuration("");
       setReloadKey((prev) => prev + 1);
-    } catch {
-      setLessonError("Не удалось создать урок");
+    } catch (error) {
+      const apiError = error as ApiError | null;
+      if (apiError?.details) {
+        const details =
+          typeof apiError.details === "string"
+            ? apiError.details
+            : JSON.stringify(apiError.details, null, 2);
+        setLessonError(details);
+      } else {
+        setLessonError("Не удалось создать урок");
+      }
     } finally {
       setLessonSaving(false);
     }
+  };
+
+  const handleLessonMaterialsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) {
+      setLessonMaterials([]);
+      setLessonMaterialsError(null);
+      return;
+    }
+    const error = validateLessonMaterials(files);
+    if (error) {
+      setLessonMaterials([]);
+      setLessonMaterialsError(error);
+      event.target.value = "";
+      return;
+    }
+    setLessonMaterialsError(null);
+    setLessonMaterials(files);
   };
 
   const handleFetchInvite = async () => {
@@ -201,18 +238,6 @@ export function CourseDetailPage() {
         </div>
       )}
 
-      {canManageLessons && (
-        <div className="page-header compact">
-          <div>
-            <h2>Уроки</h2>
-            <p>Управление уроками курса.</p>
-          </div>
-          <button className="auth-button" onClick={() => setShowCreateLesson((prev) => !prev)}>
-            {showCreateLesson ? "Скрыть форму" : "Добавить урок"}
-          </button>
-        </div>
-      )}
-
       {canManageLessons && showCreateLesson && (
         <div className="courses-hero">
           <h3>Создать урок</h3>
@@ -244,9 +269,16 @@ export function CourseDetailPage() {
                 id="lessonMaterials"
                 className="auth-input"
                 type="file"
-                onChange={(event) => setLessonMaterials(event.target.files?.[0] ?? null)}
+                multiple
+                accept={LESSON_MATERIAL_ACCEPT}
+                onChange={handleLessonMaterialsChange}
               />
-              {lessonMaterials && <div className="muted">Файл: {lessonMaterials.name}</div>}
+              {lessonMaterials.length > 0 && (
+                <div className="muted">
+                  Файлы: {lessonMaterials.map((file) => file.name).join(", ")}
+                </div>
+              )}
+              {lessonMaterialsError && <div className="auth-error">{lessonMaterialsError}</div>}
             </div>
             <div>
               <label htmlFor="lessonDuration">Длительность (минуты)</label>
@@ -264,6 +296,18 @@ export function CourseDetailPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {canManageLessons && (
+        <div className="page-header compact">
+          <div>
+            <h2>Уроки</h2>
+            <p>Управление уроками курса.</p>
+          </div>
+          <button className="auth-button" onClick={() => setShowCreateLesson((prev) => !prev)}>
+            {showCreateLesson ? "Скрыть форму" : "Добавить урок"}
+          </button>
         </div>
       )}
       {canManageLessons && (

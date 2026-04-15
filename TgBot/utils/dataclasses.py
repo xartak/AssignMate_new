@@ -32,7 +32,7 @@ class Lesson:
     order: int
     title: str
     description: str
-    materials: str | None
+    materials: list | None
     duration: int | None
 
     @classmethod

@@ -39,9 +39,9 @@ export function deleteCourse(courseId: string) {
 
 export function createLesson(
   courseId: string,
-  payload: { title: string; description: string; materials?: File | null; duration?: number | null }
+  payload: { title: string; description: string; materials?: File[]; duration?: number | null }
 ) {
-  if (payload.materials instanceof File) {
+  if (payload.materials && payload.materials.length > 0) {
     const form = new FormData();
     form.append("title", payload.title);
     if (payload.description) {
@@ -50,7 +50,7 @@ export function createLesson(
     if (typeof payload.duration === "number") {
       form.append("duration", String(payload.duration));
     }
-    form.append("materials", payload.materials);
+    payload.materials.forEach((file) => form.append("materials", file));
     return apiUpload<Lesson>(`/courses/${courseId}/lessons/`, form);
   }
 
@@ -67,16 +67,16 @@ export function createLesson(
 export function updateLesson(
   courseId: string,
   order: number,
-  payload: { title?: string; description?: string; materials?: File | null; duration?: number | null }
+  payload: { title?: string; description?: string; materials?: File[]; duration?: number | null }
 ) {
-  if (payload.materials instanceof File) {
+  if (payload.materials && payload.materials.length > 0) {
     const form = new FormData();
     if (payload.title !== undefined) form.append("title", payload.title);
     if (payload.description !== undefined) form.append("description", payload.description);
     if (typeof payload.duration === "number") {
       form.append("duration", String(payload.duration));
     }
-    form.append("materials", payload.materials);
+    payload.materials.forEach((file) => form.append("materials", file));
     return apiUpload<Lesson>(`/courses/${courseId}/lessons/${order}/`, form, "PATCH");
   }
 

@@ -109,7 +109,7 @@ DATABASES = {
         'USER': env("BACKEND_DATABASE_USER"),
         'PASSWORD': env("BACKEND_DATABASE_PASSWORD"),
         'HOST': env("BACKEND_DATABASE_HOST"),
-        'PORT': env("BACKEND_DATABASE_PORT"),
+        'PORT': env("BACKEND_DATABASE_INTERNAL_PORT"),
     }
 }
 

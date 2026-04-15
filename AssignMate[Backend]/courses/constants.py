@@ -1,0 +1,18 @@
+ALLOWED_LESSON_MATERIAL_EXTENSIONS = (
+    "pdf",
+    "doc",
+    "docx",
+    "ppt",
+    "pptx",
+    "xls",
+    "xlsx",
+    "txt",
+    "png",
+    "jpg",
+    "jpeg",
+    "gif",
+    "mp4",
+    "mp3",
+    "wav",
+    "zip",
+)

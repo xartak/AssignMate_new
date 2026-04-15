@@ -4,7 +4,7 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 import logging
 
-from config.settings import settings
+from config import settings
 from database.db import get_session
 from database.models import User
 from services.api_client import BackendAPIClient
@@ -53,7 +53,7 @@ async def start_command(
         # Отправляем токен на бэкенд для верификации
         async with BackendAPIClient(
             base_url=settings.BACKEND_URL,
-            service_token=settings.BOT_SERVICE_TOKEN,
+            service_token=settings.BOT.SERVICE_TOKEN,
         ) as client:
             result = await client.verify_token(
                 token=args,

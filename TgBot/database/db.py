@@ -5,33 +5,19 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-from config.settings import settings
+from config import settings
 
 ASYNC_DRIVER = 'postgresql+asyncpg'
 SYNC_DRIVER = 'postgresql+psycopg'
 
 Base = declarative_base()
 
-def get_async_db_url() -> str:
-    driver = ASYNC_DRIVER
-    name = settings.DATABASE.DATABASE_NAME
-    user = settings.DATABASE.DATABASE_USER
-    password = settings.DATABASE.DATABASE_PASSWORD
-    host = settings.DATABASE.DATABASE_HOST
-    port = settings.DATABASE.DATABASE_PORT
-    return f'{driver}://{user}:{password}@{host}:{port}/{name}'
+async_db_url = settings.DATABASE.get_db_url(ASYNC_DRIVER)
 
-def get_sync_db_url() -> str:
-    driver = SYNC_DRIVER
-    name = settings.DATABASE.DATABASE_NAME
-    user = settings.DATABASE.DATABASE_USER
-    password = settings.DATABASE.DATABASE_PASSWORD
-    host = settings.DATABASE.DATABASE_HOST
-    port = settings.DATABASE.DATABASE_PORT
-    return f'{driver}://{user}:{password}@{host}:{port}/{name}'
+sync_db_url = settings.DATABASE.get_db_url(SYNC_DRIVER)
 
 engine = create_async_engine(
-    url=get_async_db_url(),
+    url=async_db_url,
     echo=True,
 )
 AsyncSessionLocal = sessionmaker(

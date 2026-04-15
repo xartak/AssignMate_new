@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { fetchHomework, fetchSubmissions, submitHomework, reviewSubmission } from "@/features/assignments/api";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { fetchHomework, fetchSubmissions, submitHomework } from "@/features/assignments/api";
+import { fetchCourse } from "@/features/courses/api";
 import { fetchHomeworks } from "@/features/lessons/api";
 import type {
   AssignmentType,
@@ -12,13 +13,11 @@ import type {
   LongAnswerDetails,
   SubmissionResponse,
 } from "@/features/assignments/types";
-import { getAssignmentTypeLabel } from "@/features/assignments/types";
 import { useAsync } from "@/shared/hooks/useAsync";
 import { resolveFileUrl } from "@/shared/api/base";
 import { Loader } from "@/shared/ui/Loader";
 import { ErrorState } from "@/shared/ui/ErrorState";
 import { EmptyState } from "@/shared/ui/EmptyState";
-import { NumberInput } from "@/shared/ui/NumberInput";
 import { SingleChoiceForm } from "@/features/assignments/forms/SingleChoiceForm";
 import { MultipleChoiceForm } from "@/features/assignments/forms/MultipleChoiceForm";
 import { FillBlankForm } from "@/features/assignments/forms/FillBlankForm";
@@ -26,123 +25,133 @@ import { ShortAnswerForm } from "@/features/assignments/forms/ShortAnswerForm";
 import { LongAnswerForm } from "@/features/assignments/forms/LongAnswerForm";
 import { useAuth } from "@/shared/hooks/useAuth";
 import { formatDateTime } from "@/shared/utils/date";
+import type { ApiError } from "@/shared/api/base";
+import {
+  clearHomeworkDraft,
+  loadHomeworkDraft,
+  saveHomeworkDraft,
+  type HomeworkDraftPayload,
+} from "@/shared/storage/homeworkDrafts";
 
-const REVIEW_STATUS_LABELS: Record<string, string> = {
-  PENDING: "На проверке",
-  REVISION: "Возвращено",
-  GRADED: "Оценено",
-};
+function buildEmptyDraft(homework: HomeworkResponse): HomeworkDraftPayload {
+  switch (homework.type) {
+    case "SINGLE_CHOICE":
+      return { selected_option: null };
+    case "MULTIPLE_CHOICE":
+      return { selected_options: [] };
+    case "FILL_BLANK": {
+      const details = homework.details as FillBlankDetails | null;
+      const answers = details?.blanks
+        ? details.blanks.map((blank) => ({ position: blank.position, answer_text: "" }))
+        : [];
+      return { answers };
+    }
+    case "SHORT_ANSWER":
+      return { answer_text: "" };
+    case "LONG_ANSWER":
+      return { answer_text: "", files: [] };
+    default:
+      return {};
+  }
+}
 
-const TIMELINESS_LABELS: Record<string, string> = {
-  ON_TIME: "Во время",
-  LATE: "Опоздал",
-};
+function normalizeFillBlankAnswers(
+  details: FillBlankDetails | null,
+  answers: { position: number; answer_text: string }[] | undefined,
+) {
+  if (!details?.blanks) return answers ?? [];
+  const byPosition = new Map((answers ?? []).map((item) => [item.position, item.answer_text]));
+  return details.blanks.map((blank) => ({
+    position: blank.position,
+    answer_text: byPosition.get(blank.position) ?? "",
+  }));
+}
 
-const statusPillClass = (status?: string) => {
-  if (status === "PENDING") return "meta-pill warning";
-  if (status === "GRADED") return "meta-pill success";
-  return "meta-pill";
-};
+function buildDraftFromSubmission(
+  homework: HomeworkResponse,
+  submission: SubmissionResponse,
+): HomeworkDraftPayload {
+  const details = submission.details as Record<string, any> | null;
+  if (!details) return buildEmptyDraft(homework);
 
-const timelinessPillClass = (status?: string) => {
-  if (status === "ON_TIME") return "meta-pill success";
-  if (status === "LATE") return "meta-pill danger";
-  return "meta-pill";
-};
+  switch (homework.type) {
+    case "SINGLE_CHOICE":
+      return { selected_option: details.selected_option?.id ?? null };
+    case "MULTIPLE_CHOICE":
+      return {
+        selected_options: Array.isArray(details.selected_options)
+          ? details.selected_options.map((option: { id: number }) => option.id)
+          : [],
+      };
+    case "FILL_BLANK": {
+      const answers = Array.isArray(details.answers) ? details.answers : [];
+      const normalized = normalizeFillBlankAnswers(
+        homework.details as FillBlankDetails | null,
+        answers,
+      );
+      return { answers: normalized };
+    }
+    case "SHORT_ANSWER":
+      return { answer_text: details.answer_text ?? "" };
+    case "LONG_ANSWER":
+      return { answer_text: details.answer_text ?? "", files: [] };
+    default:
+      return buildEmptyDraft(homework);
+  }
+}
 
-function renderSubmissionWithTask(homework: HomeworkResponse, submission: SubmissionResponse) {
-  const assignmentDetails = homework.details as Record<string, unknown> | null;
-  const submissionDetails = submission.details as Record<string, unknown> | null;
-
-  if (!assignmentDetails || !submissionDetails) {
+function renderStudentSubmission(homework: HomeworkResponse, submission: SubmissionResponse) {
+  const submissionDetails = submission.details as Record<string, any> | null;
+  if (!submissionDetails) {
     return <div className="muted">Ответ не заполнен.</div>;
   }
 
   if (submission.assignment_type === "SINGLE_CHOICE") {
-    const options =
-      (assignmentDetails["options"] as { id: number; text: string; is_correct?: boolean }[]) || [];
-    const selected = submissionDetails["selected_option"] as { id?: number; text?: string } | null;
-    const correct = options.find((option) => option.is_correct);
+    const selected = submissionDetails["selected_option"] as { text?: string } | null;
     return (
       <div className="submission-details">
         <div className="muted">Ответ ученика</div>
         <div className="submission-answer-list">
           <div className="submission-answer-item">{selected?.text || "—"}</div>
         </div>
-        {correct?.text && (
-          <>
-            <div className="muted">Правильный ответ</div>
-            <div className="submission-answer-list">
-              <div className="submission-answer-item">{correct.text}</div>
-            </div>
-          </>
-        )}
       </div>
     );
   }
 
   if (submission.assignment_type === "MULTIPLE_CHOICE") {
-    const options =
-      (assignmentDetails["options"] as { id: number; text: string; is_correct?: boolean }[]) || [];
-    const selected = (submissionDetails["selected_options"] as { id?: number; text?: string }[]) || [];
-    const selectedIds = new Set(selected.map((opt) => opt.id));
-    const selectedTexts = selected.map((opt) => {
-      if (opt.text) return opt.text;
-      const fromOptions = options.find((option) => option.id === opt.id);
-      return fromOptions?.text ?? "—";
-    });
-    const correctTexts = options.filter((option) => option.is_correct).map((option) => option.text);
+    const selected = (submissionDetails["selected_options"] as { text?: string }[]) || [];
+    const texts = selected.map((option) => option.text || "—");
     return (
       <div className="submission-details">
         <div className="muted">Ответ ученика</div>
-        {selectedTexts.length === 0 ? (
+        {texts.length === 0 ? (
           <div>—</div>
         ) : (
           <div className="submission-answer-list">
-            {selectedTexts.map((text, index) => (
+            {texts.map((text, index) => (
               <div key={`${text}-${index}`} className="submission-answer-item">
-                {text || "—"}
+                {text}
               </div>
             ))}
           </div>
-        )}
-        {correctTexts.length > 0 && (
-          <>
-            <div className="muted">Правильные ответы</div>
-            <div className="submission-answer-list">
-              {correctTexts.map((text, index) => (
-                <div key={`${text}-${index}`} className="submission-answer-item">
-                  {text}
-                </div>
-              ))}
-            </div>
-          </>
         )}
       </div>
     );
   }
 
   if (submission.assignment_type === "FILL_BLANK") {
-    const blanks =
-      (assignmentDetails["blanks"] as { position: number; correct_text: string }[]) || [];
     const answers = (submissionDetails["answers"] as { position: number; answer_text: string }[]) || [];
-    const sortedAnswers = [...answers].sort((a, b) => a.position - b.position);
-    const correctByPosition = new Map(blanks.map((blank) => [blank.position, blank.correct_text]));
+    const sorted = [...answers].sort((a, b) => a.position - b.position);
     return (
       <div className="submission-details">
         <div className="muted">Ответ ученика</div>
-        {sortedAnswers.length === 0 ? (
+        {sorted.length === 0 ? (
           <div>—</div>
         ) : (
           <div className="submission-answer-list">
-            {sortedAnswers.map((answer, index) => (
+            {sorted.map((answer, index) => (
               <div key={index} className="submission-answer-item">
                 Пропуск {answer.position}: {answer.answer_text || "—"}
-                {correctByPosition.has(answer.position) && (
-                  <div className="muted">
-                    Правильный ответ: {correctByPosition.get(answer.position) || "—"}
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -195,7 +204,9 @@ function renderSubmissionWithTask(homework: HomeworkResponse, submission: Submis
 
 function renderForm(
   homework: HomeworkResponse,
-  onSubmit: (payload: unknown) => void
+  draft: HomeworkDraftPayload,
+  onChange: (next: HomeworkDraftPayload) => void,
+  disabled: boolean,
 ) {
   if (!homework.details) {
     return <div className="card">Детали задания отсутствуют</div>;
@@ -205,35 +216,51 @@ function renderForm(
       return (
         <SingleChoiceForm
           details={homework.details as SingleChoiceDetails}
-          onSubmit={(payload) => onSubmit(payload)}
+          value={draft.selected_option ?? null}
+          onChange={(selected_option) => onChange({ ...draft, selected_option })}
+          disabled={disabled}
         />
       );
     case "MULTIPLE_CHOICE":
       return (
         <MultipleChoiceForm
           details={homework.details as MultipleChoiceDetails}
-          onSubmit={(payload) => onSubmit(payload)}
+          value={draft.selected_options ?? []}
+          onChange={(selected_options) => onChange({ ...draft, selected_options })}
+          disabled={disabled}
         />
       );
     case "FILL_BLANK":
       return (
         <FillBlankForm
           details={homework.details as FillBlankDetails}
-          onSubmit={(payload) => onSubmit(payload)}
+          value={normalizeFillBlankAnswers(
+            homework.details as FillBlankDetails,
+            draft.answers,
+          )}
+          onChange={(answers) => onChange({ ...draft, answers })}
+          disabled={disabled}
         />
       );
     case "SHORT_ANSWER":
       return (
         <ShortAnswerForm
           details={homework.details as ShortAnswerDetails}
-          onSubmit={(payload) => onSubmit(payload)}
+          value={draft.answer_text ?? ""}
+          onChange={(answer_text) => onChange({ ...draft, answer_text })}
+          disabled={disabled}
         />
       );
     case "LONG_ANSWER":
       return (
         <LongAnswerForm
           details={homework.details as LongAnswerDetails}
-          onSubmit={(payload) => onSubmit(payload)}
+          value={{
+            answer_text: draft.answer_text ?? "",
+            files: draft.files ?? [],
+          }}
+          onChange={(value) => onChange({ ...draft, ...value })}
+          disabled={disabled}
         />
       );
     default:
@@ -243,9 +270,11 @@ function renderForm(
 
 export function HomeworkDetailPage() {
   const { courseId = "", lessonOrder = "", homeworkOrder = "" } = useParams();
+  const navigate = useNavigate();
   const { role } = useAuth();
   const [submissionsKey, setSubmissionsKey] = useState(0);
   const homeworksNavState = useAsync(() => fetchHomeworks(courseId, lessonOrder), [courseId, lessonOrder]);
+  const courseState = useAsync(() => fetchCourse(courseId), [courseId]);
   const homeworkState = useAsync(
     () => fetchHomework(courseId, lessonOrder, homeworkOrder),
     [courseId, lessonOrder, homeworkOrder]
@@ -255,12 +284,10 @@ export function HomeworkDetailPage() {
     [courseId, lessonOrder, homeworkOrder, submissionsKey]
   );
   const [status, setStatus] = useState<string | null>(null);
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [draft, setDraft] = useState<HomeworkDraftPayload | null>(null);
+  const [draftLoading, setDraftLoading] = useState(true);
   const [lastSubmission, setLastSubmission] = useState<SubmissionResponse | null>(null);
-  const [reviewScores, setReviewScores] = useState<Record<number, string>>({});
-  const [reviewComments, setReviewComments] = useState<Record<number, string>>({});
-  const [reviewErrors, setReviewErrors] = useState<Record<number, string>>({});
-  const [reviewLoadingId, setReviewLoadingId] = useState<number | null>(null);
-  const [reviewEditOpen, setReviewEditOpen] = useState<Record<number, boolean>>({});
   useEffect(() => {
     document.body.classList.add("theme-purple");
     return () => {
@@ -274,7 +301,6 @@ export function HomeworkDetailPage() {
   }, [homeworkState.data]);
 
   const isStudent = role === "student";
-  const isReviewer = role === "teacher" || role === "admin" || role === "assistant";
   const studentSubmission = useMemo(() => {
     if (!isStudent || !submissionsState.data || submissionsState.data.length === 0) {
       return null;
@@ -283,8 +309,56 @@ export function HomeworkDetailPage() {
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )[0];
   }, [isStudent, submissionsState.data]);
-  const canSubmit = isStudent && (!studentSubmission || studentSubmission.status === "REVISION");
   const displaySubmission = lastSubmission ?? studentSubmission;
+  const canEdit = isStudent && (!displaySubmission || displaySubmission.status === "REVISION");
+  const canSubmit = canEdit;
+  const homeworksList = homeworksNavState.data ?? [];
+  const steps = homeworksList.length > 0 ? homeworksList : homeworkState.data ? [homeworkState.data] : [];
+  const courseTitle = courseState.data?.title ?? `Курс ${courseId}`;
+  const currentOrder = Number(homeworkOrder);
+  const currentIndex = homeworksList.findIndex((hw) => hw.order === currentOrder);
+  const prevHomework = currentIndex > 0 ? homeworksList[currentIndex - 1] : null;
+  const nextHomework =
+    currentIndex >= 0 && currentIndex < homeworksList.length - 1 ? homeworksList[currentIndex + 1] : null;
+  const draftKey = `homework:${courseId}:${lessonOrder}:${homeworkOrder}`;
+
+  useEffect(() => {
+    let cancelled = false;
+    const initDraft = async () => {
+      if (!homeworkState.data) return;
+      setDraftLoading(true);
+      const stored = await loadHomeworkDraft(draftKey);
+      if (cancelled) return;
+      if (stored && stored.type === homeworkState.data.type) {
+        setDraft(stored.payload);
+      } else if (canEdit && studentSubmission) {
+        setDraft(buildDraftFromSubmission(homeworkState.data, studentSubmission));
+      } else {
+        setDraft(buildEmptyDraft(homeworkState.data));
+      }
+      setDraftLoading(false);
+    };
+    initDraft();
+    return () => {
+      cancelled = true;
+    };
+  }, [draftKey, homeworkState.data, canEdit, studentSubmission]);
+
+  useEffect(() => {
+    if (!canEdit) {
+      clearHomeworkDraft(draftKey);
+    }
+  }, [canEdit, draftKey]);
+
+  useEffect(() => {
+    if (!canEdit || draftLoading || !homeworkState.data || !draft) return;
+    const handle = window.setTimeout(() => {
+      saveHomeworkDraft(draftKey, homeworkState.data.type, draft);
+    }, 300);
+    return () => window.clearTimeout(handle);
+  }, [draft, canEdit, draftLoading, draftKey, homeworkState.data]);
+
+  const effectiveDraft = draft ?? (homeworkState.data ? buildEmptyDraft(homeworkState.data) : {});
 
   if (
     homeworkState.loading ||
@@ -296,19 +370,94 @@ export function HomeworkDetailPage() {
   if (homeworkState.error) return <ErrorState error={homeworkState.error} />;
   if (!homeworkState.data) return <EmptyState label="Домашка не найдена" />;
 
-  const homeworksList = homeworksNavState.data ?? [];
-  const currentOrder = Number(homeworkOrder);
-  const currentIndex = homeworksList.findIndex((hw) => hw.order === currentOrder);
-  const prevHomework = currentIndex > 0 ? homeworksList[currentIndex - 1] : null;
-  const nextHomework =
-    currentIndex >= 0 && currentIndex < homeworksList.length - 1 ? homeworksList[currentIndex + 1] : null;
-
-  const handleSubmit = async (payload: unknown) => {
-    if (!assignmentType) return;
+  const handleSubmit = async () => {
+    if (!assignmentType || !homeworkState.data) return;
     if (!canSubmit) {
       setStatus("Ответ уже отправлен и ожидает проверки.");
       return;
     }
+
+    let payload: unknown = null;
+    if (assignmentType === "SINGLE_CHOICE") {
+      const details = homeworkState.data.details as SingleChoiceDetails | null;
+      const selected = effectiveDraft.selected_option;
+      const optionIds = new Set((details?.options ?? []).map((option) => option.id));
+      if (selected == null || !optionIds.has(selected)) {
+        if (selected != null) {
+          setDraft((prev) => (prev ? { ...prev, selected_option: null } : prev));
+        }
+        setStatus("Выберите вариант ответа.");
+        return;
+      }
+      payload = { selected_option: selected };
+    } else if (assignmentType === "MULTIPLE_CHOICE") {
+      const details = homeworkState.data.details as MultipleChoiceDetails | null;
+      const optionIds = new Set((details?.options ?? []).map((option) => option.id));
+      const rawSelected = effectiveDraft.selected_options ?? [];
+      const selected = rawSelected.filter((id) => optionIds.has(id));
+      if (selected.length === 0) {
+        setStatus("Выберите хотя бы один вариант ответа.");
+        return;
+      }
+      if (selected.length !== rawSelected.length) {
+        setDraft((prev) => (prev ? { ...prev, selected_options: selected } : prev));
+      }
+      payload = { selected_options: selected };
+    } else if (assignmentType === "FILL_BLANK") {
+      const answers = normalizeFillBlankAnswers(
+        homeworkState.data.details as FillBlankDetails | null,
+        effectiveDraft.answers,
+      );
+      if (answers.length === 0) {
+        setStatus("Заполните все пропуски.");
+        return;
+      }
+      if (answers.some((answer) => !answer.answer_text?.trim())) {
+        setStatus("Заполните все пропуски.");
+        return;
+      }
+      payload = {
+        answers: answers.map((answer) => ({
+          ...answer,
+          answer_text: answer.answer_text.trim(),
+        })),
+      };
+    } else if (assignmentType === "SHORT_ANSWER") {
+      if (!effectiveDraft.answer_text?.trim()) {
+        setStatus("Введите ответ.");
+        return;
+      }
+      const maxLength = (homeworkState.data.details as ShortAnswerDetails | null)?.max_length;
+      const trimmed = effectiveDraft.answer_text.trim();
+      if (maxLength && trimmed.length > maxLength) {
+        setStatus(`Ответ не должен превышать ${maxLength} символов.`);
+        return;
+      }
+      payload = { answer_text: trimmed };
+    } else if (assignmentType === "LONG_ANSWER") {
+      if (!effectiveDraft.answer_text?.trim()) {
+        setStatus("Введите ответ.");
+        return;
+      }
+      const maxFiles = (homeworkState.data.details as LongAnswerDetails | null)?.max_files;
+      const files = effectiveDraft.files ?? [];
+      if (maxFiles && files.length > maxFiles) {
+        setStatus(`Можно прикрепить максимум ${maxFiles} файлов.`);
+        return;
+      }
+      const trimmed = effectiveDraft.answer_text.trim();
+      payload = {
+        answer_text: trimmed,
+        files,
+      };
+    }
+
+    if (!payload) {
+      setStatus("Ответ не заполнен.");
+      return;
+    }
+
+    setSubmitLoading(true);
     setStatus("Отправляем...");
     try {
       const result = await submitHomework(
@@ -321,115 +470,35 @@ export function HomeworkDetailPage() {
       setLastSubmission(result);
       setSubmissionsKey((prev) => prev + 1);
       setStatus("Ответ отправлен");
+      clearHomeworkDraft(draftKey);
     } catch (error) {
-      setStatus("Не удалось отправить ответ");
-      console.error(error);
-    }
-  };
-
-  const handleReviewScoreChange = (submissionId: number, value: string) => {
-    setReviewScores((prev) => ({ ...prev, [submissionId]: value }));
-  };
-
-  const handleReviewCommentChange = (submissionId: number, value: string) => {
-    setReviewComments((prev) => ({ ...prev, [submissionId]: value }));
-  };
-
-  const handleGrade = async (submission: SubmissionResponse) => {
-    if (!homeworkState.data) return;
-    const raw = reviewScores[submission.id] ?? "";
-    const parsed = Number(raw);
-    if (!Number.isFinite(parsed) || parsed < 0 || parsed > homeworkState.data.max_score) {
-      setReviewErrors((prev) => ({
-        ...prev,
-        [submission.id]: `Оценка должна быть от 0 до ${homeworkState.data.max_score}.`,
-      }));
-      return;
-    }
-    setReviewErrors((prev) => ({ ...prev, [submission.id]: "" }));
-    setReviewLoadingId(submission.id);
-    try {
-      await reviewSubmission(courseId, lessonOrder, homeworkOrder, submission.id, {
-        score: parsed,
-        comment: reviewComments[submission.id] ?? "",
-      });
-      setSubmissionsKey((prev) => prev + 1);
-      setReviewEditOpen((prev) => ({ ...prev, [submission.id]: false }));
-    } catch (error) {
-      setReviewErrors((prev) => ({
-        ...prev,
-        [submission.id]: "Не удалось выставить оценку.",
-      }));
+      const apiError = error as ApiError | null;
+      if (apiError?.details) {
+        const details =
+          typeof apiError.details === "string"
+            ? apiError.details
+            : JSON.stringify(apiError.details, null, 2);
+        setStatus(details);
+      } else {
+        setStatus("Не удалось отправить ответ");
+      }
       console.error(error);
     } finally {
-      setReviewLoadingId(null);
-    }
-  };
-
-  const handleRevision = async (submission: SubmissionResponse) => {
-    setReviewErrors((prev) => ({ ...prev, [submission.id]: "" }));
-    setReviewLoadingId(submission.id);
-    try {
-      await reviewSubmission(courseId, lessonOrder, homeworkOrder, submission.id, {
-        return_for_revision: true,
-        comment: reviewComments[submission.id] ?? "",
-      });
-      setSubmissionsKey((prev) => prev + 1);
-      setReviewEditOpen((prev) => ({ ...prev, [submission.id]: false }));
-    } catch (error) {
-      setReviewErrors((prev) => ({
-        ...prev,
-        [submission.id]: "Не удалось вернуть восвояси.",
-      }));
-      console.error(error);
-    } finally {
-      setReviewLoadingId(null);
+      setSubmitLoading(false);
     }
   };
 
   return (
     <div className="courses-page">
-      <div className="courses-hero page-nav">
-        <div className="nav-actions">
-          {prevHomework ? (
-            <Link
-              className="nav-button"
-              to={`/courses/${courseId}/lessons/${lessonOrder}/homeworks/${prevHomework.order}`}
-              title="Предыдущее ДЗ"
-            >
-              <span className="nav-chev">‹</span>
-              <span className="nav-text">Предыдущее ДЗ</span>
-            </Link>
-          ) : (
-            <span className="nav-button disabled" title="Предыдущего ДЗ нет">
-              <span className="nav-chev">‹</span>
-              <span className="nav-text">Предыдущее ДЗ</span>
-            </span>
-          )}
-          {nextHomework ? (
-            <Link
-              className="nav-button"
-              to={`/courses/${courseId}/lessons/${lessonOrder}/homeworks/${nextHomework.order}`}
-              title="Следующее ДЗ"
-            >
-              <span className="nav-text">Следующее ДЗ</span>
-              <span className="nav-chev">›</span>
-            </Link>
-          ) : (
-            <span className="nav-button disabled" title="Следующего ДЗ нет">
-              <span className="nav-text">Следующее ДЗ</span>
-              <span className="nav-chev">›</span>
-            </span>
-          )}
-        </div>
-      </div>
       <div className="page-header">
         <div>
-          <h1>{homeworkState.data.order}. {homeworkState.data.title}</h1>
-          <p>{homeworkState.data.description || "Описание отсутствует"}</p>
+          <h1>Домашнее задание</h1>
+          <div className="meta-row">
+            <span className="course-tag">{courseTitle}</span>
+            <span className="course-tag">Урок {lessonOrder}</span>
+          </div>
         </div>
         <div className="meta-row">
-          <span className="meta-pill">{getAssignmentTypeLabel(homeworkState.data.type)}</span>
           <span className="meta-pill">Максимальный балл: {homeworkState.data.max_score}</span>
           {homeworkState.data.deadline && (
             <span
@@ -443,141 +512,83 @@ export function HomeworkDetailPage() {
         </div>
       </div>
 
-      {!isReviewer && (
-        <div className="courses-hero">
-          <h3>Мой ответ</h3>
-          {isStudent ? (
-          <>
-            {canSubmit ? (
-              renderForm(homeworkState.data, handleSubmit)
+      <div className="courses-hero homework-panel">
+        <div className="homework-steps">
+          {steps.map((homework) => (
+            <Link
+              key={homework.order}
+              className={`homework-step ${homework.order === currentOrder ? "active" : ""}`}
+              to={`/courses/${courseId}/lessons/${lessonOrder}/homeworks/${homework.order}`}
+              title={homework.title}
+            >
+              {homework.order}
+            </Link>
+          ))}
+        </div>
+        <div className="homework-box">
+          <div className="muted">Описание задания</div>
+          <div>{homeworkState.data.description || "Описание отсутствует"}</div>
+        </div>
+        <div className="homework-box">
+          <div className="muted">Задание</div>
+          {homeworkState.data.title && <div>{homeworkState.data.title}</div>}
+          <div className="homework-form">
+            {isStudent ? (
+              canEdit ? (
+                draftLoading ? (
+                  <div className="muted">Загружаем черновик...</div>
+                ) : (
+                  renderForm(homeworkState.data, effectiveDraft, setDraft, false)
+                )
+              ) : displaySubmission ? (
+                renderStudentSubmission(homeworkState.data, displaySubmission)
+              ) : (
+                <div className="muted">Ответ не найден.</div>
+              )
             ) : (
-              <div className="muted">
-                Ответ уже отправлен. Статус проверки:{" "}
-                {studentSubmission ? REVIEW_STATUS_LABELS[studentSubmission.status] ?? studentSubmission.status : "—"}
-              </div>
+              <div className="muted">Решение домашнего задания доступно только студентам.</div>
             )}
-            {status && <div className="muted">{status}</div>}
-          </>
-          ) : (
-            <p>Решение домашнего задания доступно только студентам.</p>
-          )}
+          </div>
         </div>
-      )}
-
-      {isStudent && (
-        <div className="courses-hero">
-          <h3>Последняя отправка</h3>
-          {displaySubmission ? (
-            <div className="meta-row">
-              <span className={statusPillClass(displaySubmission.status)}>
-                Статус: {REVIEW_STATUS_LABELS[displaySubmission.status] ?? displaySubmission.status}
-              </span>
-              <span className={timelinessPillClass(displaySubmission.timeliness_status)}>
-                Сдано: {TIMELINESS_LABELS[displaySubmission.timeliness_status] ?? displaySubmission.timeliness_status}
-              </span>
-              <span className="meta-pill">
-                Оценка: {displaySubmission.review ? displaySubmission.review.score : "—"}
-              </span>
-            </div>
-          ) : (
-            <div className="muted">Пока нет отправок</div>
-          )}
+        {status && <div className="muted">{status}</div>}
+        <div className="homework-actions">
+          <button
+            className="homework-nav-button"
+            type="button"
+            disabled={!prevHomework}
+            onClick={() => {
+              if (prevHomework) {
+                navigate(`/courses/${courseId}/lessons/${lessonOrder}/homeworks/${prevHomework.order}`);
+              }
+            }}
+          >
+            Предыдущее
+          </button>
+          <div className="homework-actions-right">
+            {nextHomework ? (
+              <button
+                className="homework-nav-button"
+                type="button"
+                onClick={() => {
+                  navigate(`/courses/${courseId}/lessons/${lessonOrder}/homeworks/${nextHomework.order}`);
+                }}
+              >
+                Следующее
+              </button>
+            ) : (
+              canEdit && (
+                <button
+                  className="auth-button"
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={submitLoading || draftLoading}
+                >
+                  {submitLoading ? "Отправляем..." : "Сохранить и отправить"}
+                </button>
+              )
+            )}
+          </div>
         </div>
-      )}
-
-      <div className="courses-hero">
-        <h3>{isReviewer ? "Ответы учеников" : "История отправок"}</h3>
-        {submissionsState.error && <ErrorState error={submissionsState.error} />}
-        {!submissionsState.data || submissionsState.data.length === 0 ? (
-          <div className="muted">Отправок нет</div>
-        ) : (
-          submissionsState.data.map((submission) => {
-            const scoreValue =
-              reviewScores[submission.id] ??
-              (submission.review ? String(submission.review.score) : "");
-            const commentValue =
-              reviewComments[submission.id] ??
-              (submission.review ? submission.review.comment : "");
-            const isLocked =
-              (submission.status === "GRADED" || submission.status === "REVISION") &&
-              !reviewEditOpen[submission.id];
-            return (
-              <div key={submission.id} className="course-card">
-                <div className="submission-header">
-                  <div className="submission-summary">
-                    <strong>{submission.student_name || `Ответ #${submission.id}`}</strong>
-                    <div className="meta-row">
-                      <span className={statusPillClass(submission.status)}>
-                        Статус: {REVIEW_STATUS_LABELS[submission.status] ?? submission.status}
-                      </span>
-                      <span className={timelinessPillClass(submission.timeliness_status)}>
-                        Сдано: {TIMELINESS_LABELS[submission.timeliness_status] ?? submission.timeliness_status}
-                      </span>
-                      <span className="meta-pill">
-                        Оценка: {submission.review ? submission.review.score : "—"}
-                      </span>
-                    </div>
-                  </div>
-                  {isReviewer && isLocked && (
-                    <button
-                      className="secondary"
-                      type="button"
-                      onClick={() => setReviewEditOpen((prev) => ({ ...prev, [submission.id]: true }))}
-                    >
-                      Редактировать оценку
-                    </button>
-                  )}
-                </div>
-                {isReviewer && (
-                  <>
-                    {isLocked ? (
-                      <div className="form-actions end" />
-                    ) : (
-                      <div className="stack">
-                        <div className="row">
-                          <NumberInput
-                            min={0}
-                            max={homeworkState.data?.max_score ?? 100}
-                            placeholder="Оценка"
-                            value={scoreValue}
-                            onChange={(value) => handleReviewScoreChange(submission.id, value)}
-                          />
-                          <button
-                            className="auth-button"
-                            type="button"
-                            disabled={reviewLoadingId === submission.id}
-                            onClick={() => handleGrade(submission)}
-                          >
-                            {submission.status === "GRADED" ? "Сохранить" : "Оценить"}
-                          </button>
-                          <button
-                            className="secondary"
-                            type="button"
-                            disabled={reviewLoadingId === submission.id}
-                            onClick={() => handleRevision(submission)}
-                          >
-                            Вернуть восвояси
-                          </button>
-                        </div>
-                        <textarea
-                          className="auth-input"
-                          rows={2}
-                          placeholder="Комментарий (опционально)"
-                          value={commentValue}
-                          onChange={(event) => handleReviewCommentChange(submission.id, event.target.value)}
-                        />
-                        {reviewErrors[submission.id] && (
-                          <div className="auth-error">{reviewErrors[submission.id]}</div>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
-                {!isLocked && renderSubmissionWithTask(homeworkState.data, submission)}
-              </div>
-            );
-          })
-        )}
       </div>
     </div>
   );

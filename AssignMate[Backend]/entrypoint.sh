@@ -15,7 +15,7 @@ if not dsn:
     user = os.environ.get("DATABASE_USER")
     password = os.environ.get("DATABASE_PASSWORD")
     host = os.environ.get("DATABASE_HOST", "localhost")
-    port = os.environ.get("DATABASE_PORT", "5432")
+    port = os.environ.get("BACKEND_DATABASE_INTERNAL_PORT", "5432")
     if name and user and password:
         dsn = f"postgresql://{user}:{password}@{host}:{port}/{name}"
 

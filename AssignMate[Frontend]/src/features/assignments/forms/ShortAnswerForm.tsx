@@ -1,30 +1,26 @@
-import { useState } from "react";
 import type { ShortAnswerDetails } from "@/features/assignments/types";
 
 export function ShortAnswerForm({
   details,
-  onSubmit,
+  value,
+  onChange,
+  disabled = false,
 }: {
   details: ShortAnswerDetails;
-  onSubmit: (payload: { answer_text: string }) => void;
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
-  const [answer, setAnswer] = useState("");
-
   return (
-    <form
-      className="stack"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSubmit({ answer_text: answer });
-      }}
-    >
+    <div className="stack">
       <div className="muted">Максимум {details.max_length} символов</div>
       <textarea
         rows={4}
-        value={answer}
-        onChange={(event) => setAnswer(event.target.value)}
+        className="auth-input"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled}
       />
-      <button type="submit">Отправить ответ</button>
-    </form>
+    </div>
   );
 }

@@ -1,48 +1,41 @@
-import { useState } from "react";
 import type { FillBlankDetails } from "@/features/assignments/types";
 
 export function FillBlankForm({
   details,
-  onSubmit,
+  value,
+  onChange,
+  disabled = false,
 }: {
   details: FillBlankDetails;
-  onSubmit: (payload: { answers: { position: number; answer_text: string }[] }) => void;
+  value: { position: number; answer_text: string }[];
+  onChange: (value: { position: number; answer_text: string }[]) => void;
+  disabled?: boolean;
 }) {
-  const [answers, setAnswers] = useState(() =>
-    details.blanks.map((blank) => ({ position: blank.position, answer_text: "" }))
-  );
-
-  const updateAnswer = (index: number, value: string) => {
-    setAnswers((prev) =>
-      prev.map((item, idx) => (idx === index ? { ...item, answer_text: value } : item))
-    );
-  };
-
   return (
-    <form
-      className="stack"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSubmit({ answers });
-      }}
-    >
+    <div className="stack">
       <div className="card">
         <div className="muted">Текст с пропусками:</div>
         <div>{details.text_template}</div>
       </div>
       <div className="stack">
-        {answers.map((item, index) => (
+        {value.map((item, index) => (
           <div key={item.position}>
             <label>Пропуск {item.position}</label>
             <input
+              className="auth-input"
               value={item.answer_text}
-              onChange={(event) => updateAnswer(index, event.target.value)}
+              onChange={(event) => {
+                const next = value.map((answer, idx) =>
+                  idx === index ? { ...answer, answer_text: event.target.value } : answer
+                );
+                onChange(next);
+              }}
               placeholder="Введите ответ"
+              disabled={disabled}
             />
           </div>
         ))}
       </div>
-      <button type="submit">Отправить ответ</button>
-    </form>
+    </div>
   );
 }

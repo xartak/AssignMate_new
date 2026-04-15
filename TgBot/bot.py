@@ -3,7 +3,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from config.settings import settings
+from config import settings
 from handlers import start, courses, profile
 from middlewares.auth import AuthMiddleware
 
@@ -19,7 +19,7 @@ async def main():
     logger.info("Starting bot...")
 
     # Создаем бота и диспетчер
-    bot = Bot(token=settings.BOT_TOKEN)
+    bot = Bot(token=settings.BOT.TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
 
     # Подключаем middleware

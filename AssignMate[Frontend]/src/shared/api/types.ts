@@ -10,7 +10,7 @@ export type Lesson = {
   order: number;
   title: string;
   description: string;
-  materials?: string | null;
+  materials?: string[] | null;
   duration: number | null;
 };
 

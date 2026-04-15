@@ -5,7 +5,7 @@ from sqlalchemy import pool
 
 from alembic import context
 
-from database.db import Base, get_sync_db_url
+from database.db import Base, sync_db_url
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -24,7 +24,7 @@ if config.config_file_name is not None:
 from database.models import User
 target_metadata = Base.metadata
 
-url_for_migration = get_sync_db_url()
+url_for_migration = sync_db_url
 config.set_main_option("sqlalchemy.url", url_for_migration)
 
 # other values from the config, defined by the needs of env.py,

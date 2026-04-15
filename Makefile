@@ -1,18 +1,18 @@
-.PHONY: compose-up compose-up-d compose-down compose-build compose-logs backend-up frontend-up db-up backend-stop frontend-stop db-stop
+.PHONY: up up-d down build logs backend-up frontend-up db-up backend-stop frontend-stop db-stop
 
-compose-up:
-	docker compose up --build
+up:
+	docker compose up
 
-compose-up-d:
+up-d:
 	docker compose up -d --build
 
-compose-down:
+down:
 	docker compose down
 
-compose-build:
+build:
 	docker compose build
 
-compose-logs:
+logs:
 	docker compose logs -f --tail=200
 
 backend-up:

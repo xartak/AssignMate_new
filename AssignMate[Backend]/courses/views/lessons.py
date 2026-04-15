@@ -61,7 +61,11 @@ class LessonViewSet(CourseContextMixin, ActionPermissionsMixin, ActionSerializer
         course = self.get_course()
         user = self.request.user
 
-        return Lesson.objects.visible_to(user, course).order_by('order')
+        return (
+            Lesson.objects.visible_to(user, course)
+            .prefetch_related("materials_files")
+            .order_by('order')
+        )
 
     def get_object(self):
         """

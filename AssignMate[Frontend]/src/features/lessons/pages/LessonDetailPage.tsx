@@ -8,13 +8,15 @@ import { ErrorState } from "@/shared/ui/ErrorState";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { createHomework } from "@/features/assignments/api";
 import type { AssignmentType } from "@/features/assignments/types";
-import { getAssignmentTypeLabel } from "@/features/assignments/types";
 import type { ApiError } from "@/shared/api/base";
 import { resolveFileUrl } from "@/shared/api/base";
 import { useAuth } from "@/shared/hooks/useAuth";
 import { NumberInput } from "@/shared/ui/NumberInput";
-import { formatDateTime } from "@/shared/utils/date";
 import type { Lesson } from "@/shared/api/types";
+import {
+  LESSON_MATERIAL_ACCEPT,
+  validateLessonMaterials,
+} from "@/shared/constants/lessonMaterials";
 
 type OptionDraft = {
   text: string;
@@ -39,7 +41,8 @@ export function LessonDetailPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editDuration, setEditDuration] = useState("");
-  const [editMaterials, setEditMaterials] = useState<File | null>(null);
+  const [editMaterials, setEditMaterials] = useState<File[]>([]);
+  const [editMaterialsError, setEditMaterialsError] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [showCreateHomework, setShowCreateHomework] = useState(false);
@@ -95,6 +98,11 @@ export function LessonDetailPage() {
   const prevLesson = currentIndex > 0 ? lessonsList[currentIndex - 1] : null;
   const nextLesson =
     currentIndex >= 0 && currentIndex < lessonsList.length - 1 ? lessonsList[currentIndex + 1] : null;
+  const materialsList = Array.isArray(lessonData.materials)
+    ? lessonData.materials
+    : lessonData.materials
+      ? [lessonData.materials]
+      : [];
 
   const handleOptionText = (index: number, value: string) => {
     setOptions((prev) => prev.map((opt, idx) => (idx === index ? { ...opt, text: value } : opt)));
@@ -238,6 +246,10 @@ export function LessonDetailPage() {
 
   const handleLessonUpdate = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (editMaterialsError) {
+      setEditError(editMaterialsError);
+      return;
+    }
     setEditSaving(true);
     setEditError(null);
     try {
@@ -245,16 +257,44 @@ export function LessonDetailPage() {
         title: editTitle,
         description: editDescription,
         duration: editDuration ? Number(editDuration) : null,
-        materials: editMaterials || undefined,
+        materials: editMaterials.length > 0 ? editMaterials : undefined,
       });
       setLessonData(updated);
       setIsEditingLesson(false);
-      setEditMaterials(null);
-    } catch {
-      setEditError("Не удалось обновить урок");
+      setEditMaterials([]);
+      setEditMaterialsError(null);
+    } catch (error) {
+      const apiError = error as ApiError | null;
+      if (apiError?.details) {
+        const details =
+          typeof apiError.details === "string"
+            ? apiError.details
+            : JSON.stringify(apiError.details, null, 2);
+        setEditError(details);
+      } else {
+        setEditError("Не удалось обновить урок");
+      }
     } finally {
       setEditSaving(false);
     }
+  };
+
+  const handleEditMaterialsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) {
+      setEditMaterials([]);
+      setEditMaterialsError(null);
+      return;
+    }
+    const error = validateLessonMaterials(files);
+    if (error) {
+      setEditMaterials([]);
+      setEditMaterialsError(error);
+      event.target.value = "";
+      return;
+    }
+    setEditMaterialsError(null);
+    setEditMaterials(files);
   };
 
   const handleLessonDelete = async () => {
@@ -325,12 +365,25 @@ export function LessonDetailPage() {
           )}
         </div>
       </div>
-      {lessonData.materials && (
+      {materialsList.length > 0 && (
         <div className="courses-hero">
           <h3>Материалы урока</h3>
-          <a className="submission-file" href={resolveFileUrl(lessonData.materials)} target="_blank" rel="noreferrer">
-            Скачать материалы
-          </a>
+          <div className="stack">
+            {materialsList.map((material) => {
+              const fileName = decodeURIComponent(material.split("/").pop() || "Материал");
+              return (
+                <a
+                  key={material}
+                  className="submission-file"
+                  href={resolveFileUrl(material)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {fileName}
+                </a>
+              );
+            })}
+          </div>
         </div>
       )}
       {canManageLesson && isEditingLesson && (
@@ -363,9 +416,16 @@ export function LessonDetailPage() {
                 id="lessonEditMaterials"
                 className="auth-input"
                 type="file"
-                onChange={(event) => setEditMaterials(event.target.files?.[0] ?? null)}
+                multiple
+                accept={LESSON_MATERIAL_ACCEPT}
+                onChange={handleEditMaterialsChange}
               />
-              {editMaterials && <div className="muted">Файл: {editMaterials.name}</div>}
+              {editMaterials.length > 0 && (
+                <div className="muted">
+                  Файлы: {editMaterials.map((file) => file.name).join(", ")}
+                </div>
+              )}
+              {editMaterialsError && <div className="auth-error">{editMaterialsError}</div>}
             </div>
             <div>
               <label htmlFor="lessonEditDuration">Длительность (минуты)</label>
@@ -383,17 +443,6 @@ export function LessonDetailPage() {
               </button>
             </div>
           </form>
-        </div>
-      )}
-      {canManageLesson && (
-        <div className="page-header compact">
-          <div>
-            <h2>Домашние задания</h2>
-            <p>Управление заданиями урока.</p>
-          </div>
-          <button className="auth-button" onClick={() => setShowCreateHomework((prev) => !prev)}>
-            {showCreateHomework ? "Скрыть форму" : "Добавить ДЗ"}
-          </button>
         </div>
       )}
       {canManageLesson && showCreateHomework && (
@@ -647,32 +696,32 @@ export function LessonDetailPage() {
           </form>
         </div>
       )}
+      {canManageLesson && (
+        <div className="page-header compact">
+          <div>
+            <h2>Домашние задания</h2>
+            <p>Управление заданиями урока.</p>
+          </div>
+          <button className="auth-button" onClick={() => setShowCreateHomework((prev) => !prev)}>
+            {showCreateHomework ? "Скрыть форму" : "Добавить ДЗ"}
+          </button>
+        </div>
+      )}
       <div className="stack">
         {!canManageLesson && <h3>Домашние задания</h3>}
         {homeworksState.error && <ErrorState error={homeworksState.error} />}
         {!homeworksState.data || homeworksState.data.length === 0 ? (
           <EmptyState label="Домашние задания пока не добавлены" />
         ) : (
-          <div className="courses-grid">
-            {homeworksState.data.map((homework) => (
-              <Link
-                key={homework.id}
-                to={`/courses/${courseId}/lessons/${lessonOrder}/homeworks/${homework.order}`}
-                className="course-card"
-              >
-                <div className="course-title">{homework.order}. {homework.title}</div>
-                <div className="course-desc">{homework.description || "Описание отсутствует"}</div>
-                <div className="course-meta">
-                  <span className="course-tag">{getAssignmentTypeLabel(homework.type)}</span>
-                </div>
-                <div className="meta-row">
-                  <span className="meta-pill">Максимальный балл: {homework.max_score}</span>
-                  {homework.deadline && (
-                    <span className="meta-pill">Дедлайн: {formatDateTime(homework.deadline)}</span>
-                  )}
-                </div>
-              </Link>
-            ))}
+          <div className="row">
+            <Link
+              className="auth-button"
+              to={`/courses/${courseId}/lessons/${lessonOrder}/homeworks/${
+                [...homeworksState.data].sort((a, b) => a.order - b.order)[0].order
+              }`}
+            >
+              Перейти к домашнему заданию
+            </Link>
           </div>
         )}
       </div>

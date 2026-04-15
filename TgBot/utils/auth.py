@@ -2,7 +2,7 @@ import logging
 
 from sqlalchemy import select
 
-from config.settings import settings
+from config import settings
 from database.db import get_session
 from database.models import User
 from services.api_client import BackendAPIClient
@@ -16,7 +16,7 @@ async def refresh_user_tokens(user: User) -> bool:
 
     async with BackendAPIClient(
         base_url=settings.BACKEND_URL,
-        service_token=settings.BOT_SERVICE_TOKEN,
+        service_token=settings.BOT.SERVICE_TOKEN,
     ) as client:
         tokens = await client.refresh_token(user.refresh_token)
 

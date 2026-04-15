@@ -2,7 +2,7 @@
 
 from django.contrib import admin
 
-from courses.models import Course, Lesson, Enrollment, CourseStaff
+from courses.models import Course, Lesson, LessonMaterial, Enrollment, CourseStaff
 
 
 @admin.register(Course)
@@ -35,4 +35,12 @@ class CourseStaffAdmin(admin.ModelAdmin):
     list_display = ("id", "course", "user", "role", "created_at")
     search_fields = ("course__title", "user__email")
     list_filter = ("role", "created_at")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(LessonMaterial)
+class LessonMaterialAdmin(admin.ModelAdmin):
+    list_display = ("id", "lesson", "file", "created_at")
+    search_fields = ("lesson__title", "file")
+    list_filter = ("created_at",)
     readonly_fields = ("created_at", "updated_at")

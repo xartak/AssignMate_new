@@ -2,7 +2,7 @@ from aiogram import Router, F
 from aiogram.types import Message
 import logging
 
-from config.settings import settings
+from config import settings
 from services.api_client import BackendAPIClient
 from database.models import User
 from utils.auth import request_with_refresh
@@ -31,7 +31,7 @@ async def show_profile(
 
     async with BackendAPIClient(
         base_url=settings.BACKEND_URL,
-        service_token=settings.BOT_SERVICE_TOKEN,
+        service_token=settings.BOT.SERVICE_TOKEN,
     ) as client:
         profile, status, access_token = await request_with_refresh(
             user,
@@ -66,8 +66,8 @@ async def show_profile(
 async def show_help(message: Message):
     await message.answer(
         text=format_help(
-            support_email=settings.SUPPORT_EMAIL,
-            support_telegram=settings.SUPPORT_TELEGRAM,
+            support_email=settings.SUPPORT.EMAIL,
+            support_telegram=settings.SUPPORT.TELEGRAM,
         ),
         parse_mode="Markdown",
     )
