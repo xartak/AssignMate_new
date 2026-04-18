@@ -28,6 +28,40 @@ export function createHomework(
   );
 }
 
+export function updateHomework(
+  courseId: string,
+  lessonOrder: string,
+  homeworkOrder: string | number,
+  payload: Partial<{
+    title: string;
+    description: string;
+    max_score: number;
+    deadline: string | null;
+    details: Record<string, unknown>;
+  }>
+) {
+  return apiRequest<HomeworkResponse>(
+    `/courses/${courseId}/lessons/${lessonOrder}/homeworks/${homeworkOrder}/`,
+    {
+      method: "PATCH",
+      json: payload,
+    }
+  );
+}
+
+export function deleteHomework(
+  courseId: string,
+  lessonOrder: string,
+  homeworkOrder: string | number
+) {
+  return apiRequest<void>(
+    `/courses/${courseId}/lessons/${lessonOrder}/homeworks/${homeworkOrder}/`,
+    {
+      method: "DELETE",
+    }
+  );
+}
+
 export type SubmissionPayload =
   | { selected_option: number }
   | { selected_options: number[] }

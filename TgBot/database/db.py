@@ -12,9 +12,9 @@ SYNC_DRIVER = 'postgresql+psycopg'
 
 Base = declarative_base()
 
-async_db_url = settings.DATABASE.get_db_url(ASYNC_DRIVER)
+async_db_url = settings.DATABASE.get_db_url(driver=ASYNC_DRIVER)
 
-sync_db_url = settings.DATABASE.get_db_url(SYNC_DRIVER)
+sync_db_url = settings.DATABASE.get_db_url(driver=SYNC_DRIVER)
 
 engine = create_async_engine(
     url=async_db_url,

@@ -6,7 +6,7 @@ import { useAsync } from "@/shared/hooks/useAsync";
 import { Loader } from "@/shared/ui/Loader";
 import { ErrorState } from "@/shared/ui/ErrorState";
 import { EmptyState } from "@/shared/ui/EmptyState";
-import { createHomework } from "@/features/assignments/api";
+import { createHomework, deleteHomework } from "@/features/assignments/api";
 import type { AssignmentType } from "@/features/assignments/types";
 import type { ApiError } from "@/shared/api/base";
 import { resolveFileUrl } from "@/shared/api/base";
@@ -18,14 +18,94 @@ import {
   validateLessonMaterials,
 } from "@/shared/constants/lessonMaterials";
 
-type OptionDraft = {
-  text: string;
-  is_correct: boolean;
-};
+const HOMEWORK_TYPE_ITEMS: { type: AssignmentType; label: string }[] = [
+  { type: "SINGLE_CHOICE", label: "Выбор одного" },
+  { type: "MULTIPLE_CHOICE", label: "Выбор нескольких" },
+  { type: "FILL_BLANK", label: "Вставить пропуск" },
+  { type: "SHORT_ANSWER", label: "Краткий ответ" },
+  { type: "LONG_ANSWER", label: "Развернутый ответ" },
+];
 
-type BlankDraft = {
-  correct_text: string;
-};
+function buildHomeworkTemplate(
+  type: AssignmentType,
+  title: string,
+): {
+  title: string;
+  description: string;
+  type: AssignmentType;
+  max_score: number;
+  deadline: null;
+  details: Record<string, unknown>;
+} {
+  if (type === "SINGLE_CHOICE") {
+    return {
+      title,
+      description: "",
+      type,
+      max_score: 5,
+      deadline: null,
+      details: {
+        shuffle_options: false,
+        options: [
+          { text: "Вариант 1", is_correct: true },
+          { text: "Вариант 2", is_correct: false },
+        ],
+      },
+    };
+  }
+  if (type === "MULTIPLE_CHOICE") {
+    return {
+      title,
+      description: "",
+      type,
+      max_score: 5,
+      deadline: null,
+      details: {
+        shuffle_options: false,
+        options: [
+          { text: "Вариант 1", is_correct: true },
+          { text: "Вариант 2", is_correct: false },
+        ],
+      },
+    };
+  }
+  if (type === "FILL_BLANK") {
+    return {
+      title,
+      description: "",
+      type,
+      max_score: 5,
+      deadline: null,
+      details: {
+        text_template: "Заполните пропуск в тексте.",
+        blanks: [{ position: 1, correct_text: "Ответ" }],
+      },
+    };
+  }
+  if (type === "SHORT_ANSWER") {
+    return {
+      title,
+      description: "",
+      type,
+      max_score: 5,
+      deadline: null,
+      details: {
+        max_length: 200,
+        case_sensitive: false,
+      },
+    };
+  }
+  return {
+    title,
+    description: "",
+    type,
+    max_score: 5,
+    deadline: null,
+    details: {
+      max_files: 3,
+    },
+  };
+}
 
 export function LessonDetailPage() {
   const { courseId = "", lessonOrder = "" } = useParams();
@@ -45,25 +125,11 @@ export function LessonDetailPage() {
   const [editMaterialsError, setEditMaterialsError] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
-  const [showCreateHomework, setShowCreateHomework] = useState(false);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [type, setType] = useState<AssignmentType>("SINGLE_CHOICE");
-  const [maxScore, setMaxScore] = useState("10");
-  const [deadline, setDeadline] = useState("");
-  const [noDeadline, setNoDeadline] = useState(false);
-  const [shuffleOptions, setShuffleOptions] = useState(false);
-  const [options, setOptions] = useState<OptionDraft[]>([
-    { text: "", is_correct: true },
-    { text: "", is_correct: false },
-  ]);
-  const [textTemplate, setTextTemplate] = useState("");
-  const [blanks, setBlanks] = useState<BlankDraft[]>([{ correct_text: "" }]);
-  const [shortMaxLength, setShortMaxLength] = useState("200");
-  const [shortCaseSensitive, setShortCaseSensitive] = useState(false);
-  const [longMaxFiles, setLongMaxFiles] = useState("3");
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [showTypeMenu, setShowTypeMenu] = useState(false);
+  const [createLoadingType, setCreateLoadingType] = useState<AssignmentType | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [deleteOrderLoading, setDeleteOrderLoading] = useState<number | null>(null);
+  const [deleteAllLoading, setDeleteAllLoading] = useState(false);
   useEffect(() => {
     document.body.classList.add("theme-purple");
     return () => {
@@ -103,130 +169,42 @@ export function LessonDetailPage() {
     : lessonData.materials
       ? [lessonData.materials]
       : [];
+  const homeworksList = [...(homeworksState.data ?? [])].sort((a, b) => a.order - b.order);
+  const totalMaxScore = homeworksList.reduce((sum, item) => sum + (item.max_score ?? 0), 0);
 
-  const handleOptionText = (index: number, value: string) => {
-    setOptions((prev) => prev.map((opt, idx) => (idx === index ? { ...opt, text: value } : opt)));
-  };
-
-  const handleSingleCorrect = (index: number) => {
-    setOptions((prev) => prev.map((opt, idx) => ({ ...opt, is_correct: idx === index })));
-  };
-
-  const handleMultipleCorrect = (index: number) => {
-    setOptions((prev) =>
-      prev.map((opt, idx) => (idx === index ? { ...opt, is_correct: !opt.is_correct } : opt))
-    );
-  };
-
-  const addOption = () => setOptions((prev) => [...prev, { text: "", is_correct: false }]);
-  const removeOption = (index: number) =>
-    setOptions((prev) => prev.filter((_, idx) => idx !== index));
-
-  const addBlank = () => setBlanks((prev) => [...prev, { correct_text: "" }]);
-  const removeBlank = (index: number) =>
-    setBlanks((prev) => prev.filter((_, idx) => idx !== index));
-
-  const updateBlank = (index: number, value: string) => {
-    setBlanks((prev) => prev.map((blank, idx) => (idx === index ? { ...blank, correct_text: value } : blank)));
-  };
-
-  const buildDetails = () => {
-    if (type === "SINGLE_CHOICE") {
-      if (options.length < 2) return { error: "Добавьте минимум два варианта ответа." };
-      const cleanedOptions = options.map((opt) => ({ ...opt, text: opt.text.trim() }));
-      if (cleanedOptions.some((opt) => !opt.text)) {
-        return { error: "Заполните текст всех вариантов ответа." };
-      }
-      const correctCount = cleanedOptions.filter((opt) => opt.is_correct).length;
-      if (correctCount === 0) return { error: "Выберите правильный ответ." };
-      if (correctCount > 1) return { error: "Для выбора одного отметьте только один вариант." };
-      return { value: { shuffle_options: shuffleOptions, options: cleanedOptions } };
-    }
-    if (type === "MULTIPLE_CHOICE") {
-      if (options.length < 2) return { error: "Добавьте минимум два варианта ответа." };
-      const cleanedOptions = options.map((opt) => ({ ...opt, text: opt.text.trim() }));
-      if (cleanedOptions.some((opt) => !opt.text)) {
-        return { error: "Заполните текст всех вариантов ответа." };
-      }
-      if (!cleanedOptions.some((opt) => opt.is_correct)) {
-        return { error: "Отметьте хотя бы один правильный вариант." };
-      }
-      return { value: { shuffle_options: shuffleOptions, options: cleanedOptions } };
-    }
-    if (type === "FILL_BLANK") {
-      if (!textTemplate.trim()) return { error: "Заполните текст задания." };
-      if (blanks.length === 0) return { error: "Добавьте хотя бы один пропуск." };
-      const cleanedBlanks = blanks.map((blank, index) => ({
-        position: index + 1,
-        correct_text: blank.correct_text.trim(),
-      }));
-      if (cleanedBlanks.some((blank) => !blank.correct_text)) {
-        return { error: "Заполните правильные ответы для всех пропусков." };
-      }
-      return { value: { text_template: textTemplate.trim(), blanks: cleanedBlanks } };
-    }
-    if (type === "SHORT_ANSWER") {
-      const parsed = Number(shortMaxLength);
-      if (shortMaxLength.trim() && (!Number.isFinite(parsed) || parsed <= 0)) {
-        return { error: "Максимальная длина должна быть положительным числом." };
-      }
-      const details: { max_length?: number; case_sensitive: boolean } = {
-        case_sensitive: shortCaseSensitive,
-      };
-      if (shortMaxLength.trim()) {
-        details.max_length = parsed;
-      }
-      return {
-        value: details,
-      };
-    }
-    if (type === "LONG_ANSWER") {
-      const parsed = Number(longMaxFiles);
-      if (longMaxFiles.trim() && (!Number.isFinite(parsed) || parsed < 0)) {
-        return { error: "Максимум файлов должен быть неотрицательным числом." };
-      }
-      const details: { max_files?: number } = {};
-      if (longMaxFiles.trim()) {
-        details.max_files = parsed;
-      }
-      return {
-        value: details,
-      };
-    }
-    return { error: "Неизвестный тип задания." };
-  };
-
-  const handleCreateHomework = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setSaving(true);
-    setFormError(null);
-    const detailsResult = buildDetails();
-    if (detailsResult.error) {
-      setFormError(detailsResult.error);
-      setSaving(false);
-      return;
-    }
-    const score = Number(maxScore);
-    if (!Number.isFinite(score) || score < 0) {
-      setFormError("Максимальный балл должен быть неотрицательным числом.");
-      setSaving(false);
-      return;
-    }
+  const handleCreateHomework = async (type: AssignmentType) => {
+    const nextOrder = homeworksList.length > 0 ? homeworksList[homeworksList.length - 1].order + 1 : 1;
+    const template = buildHomeworkTemplate(type, `Новое ДЗ ${nextOrder}`);
+    setCreateLoadingType(type);
+    setCreateError(null);
     try {
-      const deadlineValue = noDeadline || !deadline ? null : new Date(deadline).toISOString();
-      await createHomework(courseId, lessonOrder, {
-        title,
-        description,
-        type,
-        max_score: score,
-        deadline: deadlineValue,
-        details: detailsResult.value as Record<string, unknown>,
-      });
-      setTitle("");
-      setDescription("");
-      setMaxScore("10");
-      setDeadline("");
-      setNoDeadline(false);
+      const created = await createHomework(courseId, lessonOrder, template);
+      setShowTypeMenu(false);
+      setReloadKey((prev) => prev + 1);
+      navigate(`/courses/${courseId}/lessons/${lessonOrder}/homeworks/${created.order}`);
+    } catch (error) {
+      const apiError = error as ApiError | null;
+      if (apiError?.details) {
+        const details =
+          typeof apiError.details === "string"
+            ? apiError.details
+            : JSON.stringify(apiError.details, null, 2);
+        setCreateError(details);
+      } else {
+        setCreateError("Не удалось создать домашнее задание");
+      }
+    } finally {
+      setCreateLoadingType(null);
+    }
+  };
+
+  const handleDeleteHomework = async (order: number) => {
+    const confirmed = window.confirm(`Удалить ДЗ #${order}?`);
+    if (!confirmed) return;
+    setDeleteOrderLoading(order);
+    setCreateError(null);
+    try {
+      await deleteHomework(courseId, lessonOrder, order);
       setReloadKey((prev) => prev + 1);
     } catch (error) {
       const apiError = error as ApiError | null;
@@ -235,12 +213,41 @@ export function LessonDetailPage() {
           typeof apiError.details === "string"
             ? apiError.details
             : JSON.stringify(apiError.details, null, 2);
-        setFormError(details);
+        setCreateError(details);
       } else {
-        setFormError("Не удалось создать домашнее задание");
+        setCreateError("Не удалось удалить домашнее задание");
       }
     } finally {
-      setSaving(false);
+      setDeleteOrderLoading(null);
+    }
+  };
+
+  const handleDeleteAllHomeworks = async () => {
+    if (homeworksList.length === 0) return;
+    const confirmed = window.confirm("Удалить все домашние задания урока?");
+    if (!confirmed) return;
+    setDeleteAllLoading(true);
+    setCreateError(null);
+    try {
+      const ordersDesc = [...homeworksList].sort((a, b) => b.order - a.order).map((item) => item.order);
+      for (const order of ordersDesc) {
+        await deleteHomework(courseId, lessonOrder, order);
+      }
+      setReloadKey((prev) => prev + 1);
+      setShowTypeMenu(false);
+    } catch (error) {
+      const apiError = error as ApiError | null;
+      if (apiError?.details) {
+        const details =
+          typeof apiError.details === "string"
+            ? apiError.details
+            : JSON.stringify(apiError.details, null, 2);
+        setCreateError(details);
+      } else {
+        setCreateError("Не удалось удалить все домашние задания");
+      }
+    } finally {
+      setDeleteAllLoading(false);
     }
   };
 
@@ -445,284 +452,83 @@ export function LessonDetailPage() {
           </form>
         </div>
       )}
-      {canManageLesson && showCreateHomework && (
-        <div className="courses-hero">
-          <h3>Создать домашнее задание</h3>
-          <form className="auth-form" onSubmit={handleCreateHomework}>
-            <div>
-              <label htmlFor="homeworkTitle">Название</label>
-              <input
-                id="homeworkTitle"
-                className="auth-input"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="homeworkDescription">Описание</label>
-              <textarea
-                id="homeworkDescription"
-                className="auth-input"
-                rows={3}
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="homeworkDeadline">Дедлайн</label>
-              <div className="form-row">
-                <input
-                  id="homeworkDeadline"
-                  className="auth-input"
-                  type="datetime-local"
-                  value={deadline}
-                  onChange={(event) => setDeadline(event.target.value)}
-                  disabled={noDeadline}
-                />
-                <label className="form-inline align-right">
-                  <input
-                    type="checkbox"
-                    checked={noDeadline}
-                    onChange={(event) => {
-                      const checked = event.target.checked;
-                      setNoDeadline(checked);
-                      if (checked) {
-                        setDeadline("");
-                      }
-                    }}
-                  />
-                  Без дедлайна
-                </label>
-              </div>
-            </div>
-            <div>
-              <label htmlFor="homeworkType">Тип</label>
-              <select
-                id="homeworkType"
-                className="auth-input"
-                value={type}
-                onChange={(event) => setType(event.target.value as AssignmentType)}
-              >
-                <option value="SINGLE_CHOICE">Выбор одного</option>
-                <option value="MULTIPLE_CHOICE">Выбор нескольких</option>
-                <option value="FILL_BLANK">Вставить пропущенное</option>
-                <option value="SHORT_ANSWER">Краткий ответ</option>
-                <option value="LONG_ANSWER">Развернутый ответ</option>
-              </select>
-            </div>
-            {type === "SINGLE_CHOICE" && (
-              <div className="stack">
-                <label>Варианты ответа</label>
-                {options.map((option, index) => (
-                  <div key={index} className="form-row">
-                    <input
-                      type="radio"
-                      name="single-choice"
-                      checked={option.is_correct}
-                      onChange={() => handleSingleCorrect(index)}
-                    />
-                    <input
-                      className="auth-input"
-                      value={option.text}
-                      onChange={(event) => handleOptionText(index, event.target.value)}
-                      placeholder={`Вариант ${index + 1}`}
-                      required
-                    />
-                    {options.length > 2 && (
-                      <button
-                        type="button"
-                        className="secondary align-right"
-                        onClick={() => removeOption(index)}
-                      >
-                        Удалить
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <div className="form-actions">
-                  <button type="button" className="secondary" onClick={addOption}>
-                    Добавить вариант
-                  </button>
-                  <label className="form-inline align-right">
-                    <input
-                      type="checkbox"
-                      checked={shuffleOptions}
-                      onChange={(event) => setShuffleOptions(event.target.checked)}
-                    />
-                    Перемешивать варианты
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {type === "MULTIPLE_CHOICE" && (
-              <div className="stack">
-                <label>Варианты ответа</label>
-                {options.map((option, index) => (
-                  <div key={index} className="form-row">
-                    <input
-                      type="checkbox"
-                      checked={option.is_correct}
-                      onChange={() => handleMultipleCorrect(index)}
-                    />
-                    <input
-                      className="auth-input"
-                      value={option.text}
-                      onChange={(event) => handleOptionText(index, event.target.value)}
-                      placeholder={`Вариант ${index + 1}`}
-                      required
-                    />
-                    {options.length > 2 && (
-                      <button
-                        type="button"
-                        className="secondary align-right"
-                        onClick={() => removeOption(index)}
-                      >
-                        Удалить
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <div className="form-actions">
-                  <button type="button" className="secondary" onClick={addOption}>
-                    Добавить вариант
-                  </button>
-                  <label className="form-inline align-right">
-                    <input
-                      type="checkbox"
-                      checked={shuffleOptions}
-                      onChange={(event) => setShuffleOptions(event.target.checked)}
-                    />
-                    Перемешивать варианты
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {type === "FILL_BLANK" && (
-              <div className="stack">
-                <div>
-                  <label htmlFor="textTemplate">Текст задания</label>
-                  <textarea
-                    id="textTemplate"
-                    className="auth-input"
-                    rows={4}
-                    value={textTemplate}
-                    onChange={(event) => setTextTemplate(event.target.value)}
-                    placeholder="Введите текст с пропусками"
-                  />
-                </div>
-                <div className="stack">
-                  <label>Пропуски</label>
-                  {blanks.map((blank, index) => (
-                    <div key={index} className="form-row">
-                      <span className="meta-pill">Пропуск {index + 1}</span>
-                      <input
-                        className="auth-input"
-                        value={blank.correct_text}
-                        onChange={(event) => updateBlank(index, event.target.value)}
-                        placeholder="Правильный ответ"
-                      />
-                      {blanks.length > 1 && (
-                        <button
-                          type="button"
-                          className="secondary align-right"
-                          onClick={() => removeBlank(index)}
-                        >
-                          Удалить
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  <div className="form-actions">
-                    <button type="button" className="secondary" onClick={addBlank}>
-                      Добавить пропуск
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {type === "SHORT_ANSWER" && (
-              <div className="stack">
-                <div>
-                  <label htmlFor="shortMaxLength">Макс. длина</label>
-                  <NumberInput
-                    id="shortMaxLength"
-                    min={1}
-                    value={shortMaxLength}
-                    onChange={setShortMaxLength}
-                  />
-                </div>
-                <label className="form-inline">
-                  <input
-                    type="checkbox"
-                    checked={shortCaseSensitive}
-                    onChange={(event) => setShortCaseSensitive(event.target.checked)}
-                  />
-                  Учитывать регистр
-                </label>
-              </div>
-            )}
-
-            {type === "LONG_ANSWER" && (
-              <div className="stack">
-                <label htmlFor="longMaxFiles">Макс. файлов</label>
-                <NumberInput
-                  id="longMaxFiles"
-                  min={0}
-                  value={longMaxFiles}
-                  onChange={setLongMaxFiles}
-                />
-              </div>
-            )}
-
-            <div>
-              <label htmlFor="homeworkScore">Макс. балл</label>
-              <NumberInput
-                id="homeworkScore"
-                min={0}
-                value={maxScore}
-                onChange={setMaxScore}
-              />
-            </div>
-            {formError && <div className="auth-error">{formError}</div>}
-            <div className="form-actions end">
-              <button className="auth-button" type="submit" disabled={saving}>
-                {saving ? "Создаем..." : "Создать ДЗ"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-      {canManageLesson && (
-        <div className="page-header compact">
+      <div className="courses-hero">
+        <div className="homework-manage-header">
           <div>
-            <h2>Домашние задания</h2>
-            <p>Управление заданиями урока.</p>
+            <h3>Домашние задания</h3>
+            <p className="muted">Выберите номер задания или добавьте новое.</p>
           </div>
-          <button className="auth-button" onClick={() => setShowCreateHomework((prev) => !prev)}>
-            {showCreateHomework ? "Скрыть форму" : "Добавить ДЗ"}
-          </button>
-        </div>
-      )}
-      <div className="stack">
-        {!canManageLesson && <h3>Домашние задания</h3>}
-        {homeworksState.error && <ErrorState error={homeworksState.error} />}
-        {!homeworksState.data || homeworksState.data.length === 0 ? (
-          <EmptyState label="Домашние задания пока не добавлены" />
-        ) : (
           <div className="row">
-            <Link
-              className="auth-button"
-              to={`/courses/${courseId}/lessons/${lessonOrder}/homeworks/${
-                [...homeworksState.data].sort((a, b) => a.order - b.order)[0].order
-              }`}
-            >
-              Перейти к домашнему заданию
-            </Link>
+            <span className="meta-pill">Максимальный балл: {totalMaxScore}</span>
+            {canManageLesson && homeworksList.length > 0 && (
+              <button
+                className="danger"
+                type="button"
+                onClick={handleDeleteAllHomeworks}
+                disabled={deleteAllLoading}
+              >
+                {deleteAllLoading ? "Удаляем..." : "Удалить все ДЗ"}
+              </button>
+            )}
           </div>
+        </div>
+        {Boolean(homeworksState.error) && <ErrorState error={homeworksState.error} />}
+        {createError && <div className="auth-error">{createError}</div>}
+        <div className="homework-steps">
+          {homeworksList.map((homework) => (
+            <div key={homework.id} className="homework-step-item">
+              <Link
+                className="homework-step"
+                to={`/courses/${courseId}/lessons/${lessonOrder}/homeworks/${homework.order}`}
+                title={homework.title}
+              >
+                <span className="homework-step-order">{homework.order}</span>
+                <span className="homework-step-score">{homework.max_score}</span>
+              </Link>
+              {canManageLesson && (
+                <button
+                  className="homework-step-remove"
+                  type="button"
+                  disabled={deleteOrderLoading === homework.order || deleteAllLoading}
+                  onClick={() => handleDeleteHomework(homework.order)}
+                  aria-label={`Удалить ДЗ #${homework.order}`}
+                  title={`Удалить ДЗ #${homework.order}`}
+                >
+                  {deleteOrderLoading === homework.order ? "..." : "×"}
+                </button>
+              )}
+            </div>
+          ))}
+          {canManageLesson && (
+            <div className="homework-add-wrap">
+              <button
+                className="homework-add-trigger"
+                type="button"
+                onClick={() => setShowTypeMenu((prev) => !prev)}
+                aria-label="Добавить домашнее задание"
+              >
+                +
+              </button>
+              {showTypeMenu && (
+                <div className="homework-type-popover">
+                  {HOMEWORK_TYPE_ITEMS.map((item) => (
+                    <button
+                      key={item.type}
+                      className="homework-type-option"
+                      type="button"
+                      onClick={() => handleCreateHomework(item.type)}
+                      disabled={createLoadingType !== null}
+                    >
+                      {createLoadingType === item.type ? "Создаем..." : item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        {homeworksList.length === 0 && (
+          <div className="muted">Домашние задания пока не добавлены.</div>
         )}
       </div>
     </div>

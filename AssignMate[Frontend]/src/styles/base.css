@@ -560,8 +560,14 @@ body.theme-purple nav button.secondary {
   gap: 8px;
 }
 
+.homework-step-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .homework-step {
-  width: 32px;
+  min-width: 46px;
   height: 32px;
   border-radius: 8px;
   background: #5c4aa0;
@@ -570,6 +576,8 @@ body.theme-purple nav button.secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
+  padding: 0 8px;
   border: 1px solid transparent;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
@@ -584,6 +592,122 @@ body.theme-purple nav button.secondary {
   color: #2f254e;
   border-color: #cfc7f0;
   box-shadow: none;
+}
+
+.homework-step-order {
+  line-height: 1;
+}
+
+.homework-step-score {
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.homework-step.active .homework-step-score {
+  background: rgba(47, 37, 78, 0.14);
+}
+
+.homework-step-remove {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #eb5d7d;
+  color: #ffffff;
+  padding: 0;
+  line-height: 1;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.homework-step-remove:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.homework-manage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.homework-add-wrap {
+  position: relative;
+}
+
+.homework-add-trigger {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #8b74dd;
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.homework-add-trigger:hover {
+  filter: brightness(0.98);
+}
+
+.homework-type-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 220px;
+  z-index: 20;
+  background: #ffffff;
+  border: 1px solid #e1dcf7;
+  border-radius: 12px;
+  box-shadow: 0 12px 26px rgba(30, 20, 80, 0.18);
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.homework-type-option {
+  width: 100%;
+  text-align: left;
+  background: #ffffff;
+  color: #2f254e;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-weight: 600;
+}
+
+.homework-type-option:hover {
+  background: #f4f1ff;
+  border-color: #e1dcf7;
+}
+
+.homework-type-option:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.homework-manage-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.homework-score-edit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .homework-box {
@@ -627,6 +751,14 @@ body.theme-purple nav button.secondary {
   background: #d7d2e8;
   color: #6c6a78;
   cursor: not-allowed;
+}
+
+@media (max-width: 680px) {
+  .homework-type-popover {
+    left: auto;
+    right: 0;
+    min-width: 190px;
+  }
 }
 
 .courses-grid {
