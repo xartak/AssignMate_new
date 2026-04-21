@@ -47,13 +47,13 @@ services:
   tg_bot_db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: ${TG_BOT_DATABASE_NAME}
-      POSTGRES_USER: ${TG_BOT_DATABASE_USER}
-      POSTGRES_PASSWORD: ${TG_BOT_DATABASE_PASSWORD}
+      POSTGRES_DB: ${TG_BOT_DATABASE__NAME}
+      POSTGRES_USER: ${TG_BOT_DATABASE__USER}
+      POSTGRES_PASSWORD: ${TG_BOT_DATABASE__PASSWORD}
     volumes:
       - ./DockerVolumes/tg-bot-db-data:/var/lib/postgresql/data
     ports:
-      - "${TG_BOT_DATABASE_EXTERNAL_PORT}:${TG_BOT_DATABASE_INTERNAL_PORT}"
+      - "${TG_BOT_DATABASE__EXTERNAL_PORT}:${TG_BOT_DATABASE__INTERNAL_PORT}"
 
 
   tg_bot:

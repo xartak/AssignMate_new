@@ -1,40 +1,46 @@
-import os
-from dataclasses import dataclass
-from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
-@dataclass
-class BotSettings:
-    TOKEN: str = os.getenv('TG_BOT_TOKEN')
-    BOT_SERVICE_TOKEN: str = os.getenv('TG_BOT_SERVICE_TOKEN')
+BASE_DIR = Path(__file__).resolve().parents[2]
 
 
-@dataclass
-class DatabaseSettings:
-    NAME: str = os.getenv('TG_BOT_DATABASE_NAME')
-    USER: str = os.getenv('TG_BOT_DATABASE_USER')
-    PASSWORD: str = os.getenv('TG_BOT_DATABASE_PASSWORD')
-    HOST: str = os.getenv('TG_BOT_DATABASE_HOST')
-    PORT: int = os.getenv('TG_BOT_DATABASE_INTERNAL_PORT')
+class RunSettings(BaseModel):
+    TOKEN: str = 'your-token'
+    BOT_SERVICE_TOKEN: str = 'your-service-token'
+
+
+class DatabaseSettings(BaseModel):
+    NAME: str = 'postgres'
+    USER: str = 'postgres'
+    PASSWORD: str = 'postgres'
+    HOST: str = 'localhost'
+    INTERNAL_PORT: int = 5432
+    EXTERNAL_PORT: int = 5434
+
+
+class SupportSettings(BaseModel):
+    EMAIL: str = 'your-email'
+    TELEGRAM: str = 'your-telegram'
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=[BASE_DIR / '.env'],
+        case_sensitive=False,
+        env_nested_delimiter="__",
+        env_prefix='TG_BOT_',
+        extra='ignore',
+    )
+
+    RUN: RunSettings = RunSettings()
+    DATABASE: DatabaseSettings = DatabaseSettings()
+    BACKEND_URL: str = 'backend-url'
+    SUPPORT: SupportSettings = SupportSettings()
 
     def get_db_url(self, driver: str) -> str:
-        return (f'{driver}://{self.USER}:{self.PASSWORD}@'
-                f'{self.HOST}:{self.PORT}/{self.NAME}')
-
-
-@dataclass
-class SupportSettings:
-    EMAIL: str = os.getenv('TG_BOT_SUPPORT_EMAIL')
-    TELEGRAM: str = os.getenv('TG_BOT_SUPPORT_TELEGRAM')
-
-
-@dataclass
-class Settings:
-    BOT: BotSettings = BotSettings
-    DATABASE: DatabaseSettings = DatabaseSettings
-    BACKEND_URL: str = os.getenv('TG_BOT_BACKEND_URL')
-    SUPPORT: SupportSettings = SupportSettings
+        return (f'{driver}://{self.DATABASE.USER}:{self.DATABASE.PASSWORD}@'
+                f'{self.DATABASE.HOST}:{self.DATABASE.INTERNAL_PORT}/{self.DATABASE.NAME}')
 
 settings = Settings()
