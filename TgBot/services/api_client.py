@@ -19,10 +19,8 @@ class BackendAPIClient:
 
     async def __aenter__(self) -> "BackendAPIClient":
         self.session = aiohttp.ClientSession(
-            headers={
-                'X-Service-Token': self.service_token,
-                'Content-Type': 'application/json',
-            },
+            headers={'Content-Type': 'application/json'},
+            timeout=aiohttp.ClientTimeout(total=10),
         )
         return self
 
@@ -53,7 +51,8 @@ class BackendAPIClient:
         try:
             async with self.session.post(
                 url=url,
-                json=payload
+                json=payload,
+                headers={'X-Service-Token': self.service_token},
             ) as response:
                 if response.status == 200:
                     return await response.json()

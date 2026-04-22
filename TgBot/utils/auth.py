@@ -16,7 +16,7 @@ async def refresh_user_tokens(user: User) -> bool:
 
     async with BackendAPIClient(
         base_url=settings.BACKEND_URL,
-        service_token=settings.BOT.SERVICE_TOKEN,
+        service_token=settings.RUN.BOT_SERVICE_TOKEN,
     ) as client:
         tokens = await client.refresh_token(user.refresh_token)
 

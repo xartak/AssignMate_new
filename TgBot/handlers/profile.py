@@ -31,7 +31,7 @@ async def show_profile(
 
     async with BackendAPIClient(
         base_url=settings.BACKEND_URL,
-        service_token=settings.BOT.SERVICE_TOKEN,
+        service_token=settings.RUN.BOT_SERVICE_TOKEN,
     ) as client:
         profile, status, access_token = await request_with_refresh(
             user,

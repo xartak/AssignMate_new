@@ -53,7 +53,7 @@ async def start_command(
         # Отправляем токен на бэкенд для верификации
         async with BackendAPIClient(
             base_url=settings.BACKEND_URL,
-            service_token=settings.BOT.SERVICE_TOKEN,
+            service_token=settings.RUN.BOT_SERVICE_TOKEN,
         ) as client:
             result = await client.verify_token(
                 token=args,
@@ -80,7 +80,7 @@ async def start_command(
             await loading_msg.delete()
             await message.answer(
                 text="✅ **Аккаунт успешно привязан!**\n\n"
-                f"Добро пожаловать, {result.get('username', 'пользователь')}!\n\n"
+                f"Добро пожаловать, {result.get('email', 'пользователь')}!\n\n"
                 "Теперь вам доступны курсы. Используйте кнопки ниже для навигации.",
                 parse_mode="Markdown",
                 reply_markup=main_keyboard(),

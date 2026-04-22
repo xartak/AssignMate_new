@@ -12,6 +12,8 @@ down:
 build:
 	docker compose build
 
+rebuild: build up
+
 logs:
 	docker compose logs -f --tail=200
 

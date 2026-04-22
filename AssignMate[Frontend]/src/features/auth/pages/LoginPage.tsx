@@ -20,6 +20,7 @@ export function LoginPage() {
       const data = await login({ email, password });
       setAuth({
         token: data.access,
+        refreshToken: data.refresh,
         role: data.user.role,
         userId: data.user.id,
       });

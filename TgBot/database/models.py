@@ -18,6 +18,6 @@ class User(Base):
     refresh_token = Column(String, nullable=True)
     token_expires_at = Column(DateTime, nullable=True)
 
-    is_authenticated = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.now())
-    updated_at = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
+    is_authenticated = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)

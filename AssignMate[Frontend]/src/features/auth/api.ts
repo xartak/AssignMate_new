@@ -69,3 +69,19 @@ export function fetchMe() {
 export function updateMe(form: FormData) {
   return apiUpload<MeResponse>("/auth/me/", form, "PATCH");
 }
+
+export type RefreshResponse = { access: string; refresh?: string };
+
+export function refreshToken(refresh: string) {
+  return apiRequest<RefreshResponse>("/auth/refresh/", {
+    method: "POST",
+    json: { refresh },
+  });
+}
+
+export function logoutRequest(refresh: string) {
+  return apiRequest<null>("/auth/logout/", {
+    method: "POST",
+    json: { refresh },
+  });
+}

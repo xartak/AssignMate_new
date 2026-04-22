@@ -33,6 +33,7 @@ export function RegisterPage() {
       });
       setAuth({
         token: data.access,
+        refreshToken: data.refresh,
         role: data.user.role,
         userId: data.user.id,
       });

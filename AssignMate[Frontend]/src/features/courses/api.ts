@@ -105,9 +105,8 @@ export function fetchInviteCode(courseId: string) {
   );
 }
 
-export function joinCourse(courseId: string | null, inviteCode: string) {
-  const path = courseId ? `/courses/${courseId}/join/` : "/courses/join-by-code/";
-  return apiRequest(path, {
+export function joinCourse(inviteCode: string) {
+  return apiRequest("/courses/join-by-code/", {
     method: "POST",
     json: { invite_code: inviteCode },
   });

@@ -85,6 +85,7 @@ export type SubmissionResponse = {
   id: number;
   assignment: number;
   assignment_type: AssignmentType;
+  student: number;
   student_name: string;
   status: SubmissionReviewStatus;
   timeliness_status: SubmissionTimelinessStatus;

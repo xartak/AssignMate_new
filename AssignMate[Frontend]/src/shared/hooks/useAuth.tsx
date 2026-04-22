@@ -1,13 +1,20 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { logoutRequest } from "@/features/auth/api";
 
 export type AuthState = {
   token: string | null;
+  refreshToken: string | null;
   role: string | null;
   userId: number | null;
 };
 
 type AuthContextValue = AuthState & {
-  login: (payload: { token: string; role: string | null; userId: number | null }) => void;
+  login: (payload: {
+    token: string;
+    refreshToken: string;
+    role: string | null;
+    userId: number | null;
+  }) => void;
   logout: () => void;
 };
 
@@ -20,6 +27,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>(() => ({
     token: localStorage.getItem("auth_token"),
+    refreshToken: localStorage.getItem("auth_refresh"),
     role: normalizeRole(localStorage.getItem("auth_role")),
     userId: localStorage.getItem("auth_user_id")
       ? Number(localStorage.getItem("auth_user_id"))
@@ -29,9 +37,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       ...state,
-      login: ({ token, role, userId }) => {
+      login: ({ token, refreshToken, role, userId }) => {
         const normalizedRole = normalizeRole(role);
         localStorage.setItem("auth_token", token);
+        localStorage.setItem("auth_refresh", refreshToken);
         if (normalizedRole) {
           localStorage.setItem("auth_role", normalizedRole);
         } else {
@@ -42,13 +51,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           localStorage.removeItem("auth_user_id");
         }
-        setState({ token, role: normalizedRole, userId });
+        setState({ token, refreshToken, role: normalizedRole, userId });
       },
       logout: () => {
+        const refresh = state.refreshToken;
+        if (refresh) {
+          logoutRequest(refresh).catch(() => {});
+        }
         localStorage.removeItem("auth_token");
+        localStorage.removeItem("auth_refresh");
         localStorage.removeItem("auth_role");
         localStorage.removeItem("auth_user_id");
-        setState({ token: null, role: null, userId: null });
+        setState({ token: null, refreshToken: null, role: null, userId: null });
       },
     }),
     [state]

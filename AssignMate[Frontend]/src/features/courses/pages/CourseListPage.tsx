@@ -41,7 +41,7 @@ export function CourseListPage() {
     setJoinError(null);
     setJoinStatus(null);
     try {
-      await joinCourse("", joinCode);
+      await joinCourse(joinCode);
       setJoinStatus("Вы успешно записались на курс");
       setJoinCode("");
       setReloadKey((prev) => prev + 1);

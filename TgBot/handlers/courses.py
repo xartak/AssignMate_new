@@ -79,7 +79,7 @@ async def _render_courses_list(
 ):
     async with BackendAPIClient(
         base_url=settings.BACKEND_URL,
-        service_token=settings.BOT.SERVICE_TOKEN,
+        service_token=settings.RUN.BOT_SERVICE_TOKEN,
     ) as client:
         response, status, access_token = await request_with_refresh(
             user,
@@ -125,7 +125,7 @@ async def _render_lessons_list(
 ):
     async with BackendAPIClient(
         base_url=settings.BACKEND_URL,
-        service_token=settings.BOT.SERVICE_TOKEN,
+        service_token=settings.RUN.BOT_SERVICE_TOKEN,
     ) as client:
         course, course_status, access_token = await request_with_refresh(
             user,
@@ -202,7 +202,7 @@ async def _render_homeworks_list(
 ):
     async with BackendAPIClient(
         base_url=settings.BACKEND_URL,
-        service_token=settings.BOT.SERVICE_TOKEN,
+        service_token=settings.RUN.BOT_SERVICE_TOKEN,
     ) as client:
         course, course_status, access_token = await request_with_refresh(
             user,
@@ -300,7 +300,7 @@ async def _render_homework_detail(
 ):
     async with BackendAPIClient(
         base_url=settings.BACKEND_URL,
-        service_token=settings.BOT.SERVICE_TOKEN,
+        service_token=settings.RUN.BOT_SERVICE_TOKEN,
     ) as client:
         homework, status, access_token = await request_with_refresh(
             user,

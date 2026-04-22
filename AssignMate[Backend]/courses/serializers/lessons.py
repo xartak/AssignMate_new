@@ -138,12 +138,15 @@ class LessonUpdateSerializer(serializers.ModelSerializer):
         return files
 
     def update(self, instance, validated_data):
+        materials_provided = "materials" in validated_data
         materials = validated_data.pop("materials", [])
         lesson = super().update(instance, validated_data)
-        if materials:
-            LessonMaterial.objects.bulk_create(
-                [LessonMaterial(lesson=lesson, file=item) for item in materials]
-            )
+        if materials_provided:
+            lesson.materials_files.all().delete()
+            if materials:
+                LessonMaterial.objects.bulk_create(
+                    [LessonMaterial(lesson=lesson, file=item) for item in materials]
+                )
         return lesson
 
     def to_representation(self, instance):

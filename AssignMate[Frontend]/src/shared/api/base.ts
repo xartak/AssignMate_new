@@ -18,6 +18,17 @@ function getToken(): string | null {
   return localStorage.getItem("auth_token");
 }
 
+function getRefresh(): string | null {
+  return localStorage.getItem("auth_refresh");
+}
+
+function clearAuthStorage() {
+  localStorage.removeItem("auth_token");
+  localStorage.removeItem("auth_refresh");
+  localStorage.removeItem("auth_role");
+  localStorage.removeItem("auth_user_id");
+}
+
 function buildHeaders(isJson: boolean, extra?: HeadersInit): HeadersInit {
   const headers: HeadersInit = { ...extra };
   if (isJson) {
@@ -39,6 +50,41 @@ function buildUrl(path: string) {
   return `${API_URL}${path}`;
 }
 
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function tryRefreshTokens(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+  const refresh = getRefresh();
+  if (!refresh) return false;
+
+  refreshInFlight = (async () => {
+    try {
+      const response = await fetch(`${API_URL}/auth/refresh/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh }),
+      });
+      if (!response.ok) {
+        clearAuthStorage();
+        return false;
+      }
+      const data = (await response.json()) as { access: string; refresh?: string };
+      localStorage.setItem("auth_token", data.access);
+      if (data.refresh) {
+        localStorage.setItem("auth_refresh", data.refresh);
+      }
+      return true;
+    } catch {
+      clearAuthStorage();
+      return false;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
 export function resolveFileUrl(path: string) {
   if (path.startsWith("http://") || path.startsWith("https://")) {
     return path;
@@ -47,9 +93,18 @@ export function resolveFileUrl(path: string) {
   return `${API_ORIGIN}${normalized}`;
 }
 
+const REFRESH_PATH = "/auth/refresh/";
+const LOGIN_PATH = "/auth/login/";
+const REGISTER_PATH = "/auth/register/";
+
+function shouldAttemptRefresh(path: string): boolean {
+  return ![REFRESH_PATH, LOGIN_PATH, REGISTER_PATH].some((p) => path.startsWith(p));
+}
+
 export async function apiRequest<T>(
   path: string,
-  options: RequestInit & { json?: unknown } = {}
+  options: RequestInit & { json?: unknown } = {},
+  _retry = true
 ): Promise<T> {
   const isJson = options.json !== undefined;
   const response = await fetch(buildUrl(path), {
@@ -57,6 +112,13 @@ export async function apiRequest<T>(
     headers: buildHeaders(isJson, options.headers),
     body: isJson ? JSON.stringify(options.json) : options.body,
   });
+
+  if (response.status === 401 && _retry && shouldAttemptRefresh(path)) {
+    const refreshed = await tryRefreshTokens();
+    if (refreshed) {
+      return apiRequest<T>(path, options, false);
+    }
+  }
 
   if (!response.ok) {
     let details: unknown = null;
@@ -93,13 +155,21 @@ export function unwrapList<T>(data: T[] | PaginatedResponse<T>): T[] {
 export async function apiUpload<T>(
   path: string,
   form: FormData,
-  method: "POST" | "PATCH" | "PUT" = "POST"
+  method: "POST" | "PATCH" | "PUT" = "POST",
+  _retry = true
 ): Promise<T> {
   const response = await fetch(buildUrl(path), {
     method,
     headers: buildHeaders(false),
     body: form,
   });
+
+  if (response.status === 401 && _retry && shouldAttemptRefresh(path)) {
+    const refreshed = await tryRefreshTokens();
+    if (refreshed) {
+      return apiUpload<T>(path, form, method, false);
+    }
+  }
 
   if (!response.ok) {
     let details: unknown = null;
