@@ -727,12 +727,11 @@ export function HomeworkDetailPage() {
           {canManageHomework && (
             <div className="homework-add-wrap">
               <button
-                className="homework-add-trigger"
+                className="homework-add-cta"
                 type="button"
                 onClick={() => setShowTypeMenu((prev) => !prev)}
-                aria-label="Добавить домашнее задание"
               >
-                +
+                + Добавить ДЗ
               </button>
               {showTypeMenu && (
                 <div className="homework-type-popover">

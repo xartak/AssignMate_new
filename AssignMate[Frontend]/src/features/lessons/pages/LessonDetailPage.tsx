@@ -6,8 +6,7 @@ import { useAsync } from "@/shared/hooks/useAsync";
 import { Loader } from "@/shared/ui/Loader";
 import { ErrorState } from "@/shared/ui/ErrorState";
 import { EmptyState } from "@/shared/ui/EmptyState";
-import { createHomework, deleteHomework } from "@/features/assignments/api";
-import type { AssignmentType } from "@/features/assignments/types";
+import { deleteHomework } from "@/features/assignments/api";
 import type { ApiError } from "@/shared/api/base";
 import { resolveFileUrl } from "@/shared/api/base";
 import { useAuth } from "@/shared/hooks/useAuth";
@@ -17,95 +16,6 @@ import {
   LESSON_MATERIAL_ACCEPT,
   validateLessonMaterials,
 } from "@/shared/constants/lessonMaterials";
-
-const HOMEWORK_TYPE_ITEMS: { type: AssignmentType; label: string }[] = [
-  { type: "SINGLE_CHOICE", label: "Выбор одного" },
-  { type: "MULTIPLE_CHOICE", label: "Выбор нескольких" },
-  { type: "FILL_BLANK", label: "Вставить пропуск" },
-  { type: "SHORT_ANSWER", label: "Краткий ответ" },
-  { type: "LONG_ANSWER", label: "Развернутый ответ" },
-];
-
-function buildHomeworkTemplate(
-  type: AssignmentType,
-  title: string,
-): {
-  title: string;
-  description: string;
-  type: AssignmentType;
-  max_score: number;
-  deadline: null;
-  details: Record<string, unknown>;
-} {
-  if (type === "SINGLE_CHOICE") {
-    return {
-      title,
-      description: "",
-      type,
-      max_score: 5,
-      deadline: null,
-      details: {
-        shuffle_options: false,
-        options: [
-          { text: "Вариант 1", is_correct: true },
-          { text: "Вариант 2", is_correct: false },
-        ],
-      },
-    };
-  }
-  if (type === "MULTIPLE_CHOICE") {
-    return {
-      title,
-      description: "",
-      type,
-      max_score: 5,
-      deadline: null,
-      details: {
-        shuffle_options: false,
-        options: [
-          { text: "Вариант 1", is_correct: true },
-          { text: "Вариант 2", is_correct: false },
-        ],
-      },
-    };
-  }
-  if (type === "FILL_BLANK") {
-    return {
-      title,
-      description: "",
-      type,
-      max_score: 5,
-      deadline: null,
-      details: {
-        text_template: "Заполните пропуск в тексте.",
-        blanks: [{ position: 1, correct_text: "Ответ" }],
-      },
-    };
-  }
-  if (type === "SHORT_ANSWER") {
-    return {
-      title,
-      description: "",
-      type,
-      max_score: 5,
-      deadline: null,
-      details: {
-        max_length: 200,
-        case_sensitive: false,
-      },
-    };
-  }
-  return {
-    title,
-    description: "",
-    type,
-    max_score: 5,
-    deadline: null,
-    details: {
-      max_files: 3,
-    },
-  };
-}
 
 export function LessonDetailPage() {
   const { courseId = "", lessonOrder = "" } = useParams();
@@ -125,11 +35,8 @@ export function LessonDetailPage() {
   const [editMaterialsError, setEditMaterialsError] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
-  const [showTypeMenu, setShowTypeMenu] = useState(false);
-  const [createLoadingType, setCreateLoadingType] = useState<AssignmentType | null>(null);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [deleteOrderLoading, setDeleteOrderLoading] = useState<number | null>(null);
   const [deleteAllLoading, setDeleteAllLoading] = useState(false);
+  const [deleteAllError, setDeleteAllError] = useState<string | null>(null);
   useEffect(() => {
     document.body.classList.add("theme-purple");
     return () => {
@@ -172,69 +79,18 @@ export function LessonDetailPage() {
   const homeworksList = [...(homeworksState.data ?? [])].sort((a, b) => a.order - b.order);
   const totalMaxScore = homeworksList.reduce((sum, item) => sum + (item.max_score ?? 0), 0);
 
-  const handleCreateHomework = async (type: AssignmentType) => {
-    const nextOrder = homeworksList.length > 0 ? homeworksList[homeworksList.length - 1].order + 1 : 1;
-    const template = buildHomeworkTemplate(type, `Новое ДЗ ${nextOrder}`);
-    setCreateLoadingType(type);
-    setCreateError(null);
-    try {
-      const created = await createHomework(courseId, lessonOrder, template);
-      setShowTypeMenu(false);
-      setReloadKey((prev) => prev + 1);
-      navigate(`/courses/${courseId}/lessons/${lessonOrder}/homeworks/${created.order}`);
-    } catch (error) {
-      const apiError = error as ApiError | null;
-      if (apiError?.details) {
-        const details =
-          typeof apiError.details === "string"
-            ? apiError.details
-            : JSON.stringify(apiError.details, null, 2);
-        setCreateError(details);
-      } else {
-        setCreateError("Не удалось создать домашнее задание");
-      }
-    } finally {
-      setCreateLoadingType(null);
-    }
-  };
-
-  const handleDeleteHomework = async (order: number) => {
-    const confirmed = window.confirm(`Удалить ДЗ #${order}?`);
-    if (!confirmed) return;
-    setDeleteOrderLoading(order);
-    setCreateError(null);
-    try {
-      await deleteHomework(courseId, lessonOrder, order);
-      setReloadKey((prev) => prev + 1);
-    } catch (error) {
-      const apiError = error as ApiError | null;
-      if (apiError?.details) {
-        const details =
-          typeof apiError.details === "string"
-            ? apiError.details
-            : JSON.stringify(apiError.details, null, 2);
-        setCreateError(details);
-      } else {
-        setCreateError("Не удалось удалить домашнее задание");
-      }
-    } finally {
-      setDeleteOrderLoading(null);
-    }
-  };
-
   const handleDeleteAllHomeworks = async () => {
     if (homeworksList.length === 0) return;
     const confirmed = window.confirm("Удалить все домашние задания урока?");
     if (!confirmed) return;
     setDeleteAllLoading(true);
-    setCreateError(null);
+    setDeleteAllError(null);
     try {
       const ordersDesc = [...homeworksList].sort((a, b) => b.order - a.order).map((item) => item.order);
       for (const order of ordersDesc) {
         await deleteHomework(courseId, lessonOrder, order);
       }
       setReloadKey((prev) => prev + 1);
-      setShowTypeMenu(false);
     } catch (error) {
       const apiError = error as ApiError | null;
       if (apiError?.details) {
@@ -242,9 +98,9 @@ export function LessonDetailPage() {
           typeof apiError.details === "string"
             ? apiError.details
             : JSON.stringify(apiError.details, null, 2);
-        setCreateError(details);
+        setDeleteAllError(details);
       } else {
-        setCreateError("Не удалось удалить все домашние задания");
+        setDeleteAllError("Не удалось удалить все домашние задания");
       }
     } finally {
       setDeleteAllLoading(false);
@@ -473,61 +329,22 @@ export function LessonDetailPage() {
           </div>
         </div>
         {Boolean(homeworksState.error) && <ErrorState error={homeworksState.error} />}
-        {createError && <div className="auth-error">{createError}</div>}
-        <div className="homework-steps">
-          {homeworksList.map((homework) => (
-            <div key={homework.id} className="homework-step-item">
-              <Link
-                className="homework-step"
-                to={`/courses/${courseId}/lessons/${lessonOrder}/homeworks/${homework.order}`}
-                title={homework.title}
-              >
-                <span className="homework-step-order">{homework.order}</span>
-                <span className="homework-step-score">{homework.max_score}</span>
-              </Link>
-              {canManageLesson && (
-                <button
-                  className="homework-step-remove"
-                  type="button"
-                  disabled={deleteOrderLoading === homework.order || deleteAllLoading}
-                  onClick={() => handleDeleteHomework(homework.order)}
-                  aria-label={`Удалить ДЗ #${homework.order}`}
-                  title={`Удалить ДЗ #${homework.order}`}
-                >
-                  {deleteOrderLoading === homework.order ? "..." : "×"}
-                </button>
-              )}
-            </div>
-          ))}
-          {canManageLesson && (
-            <div className="homework-add-wrap">
-              <button
-                className="homework-add-trigger"
-                type="button"
-                onClick={() => setShowTypeMenu((prev) => !prev)}
-                aria-label="Добавить домашнее задание"
-              >
-                +
-              </button>
-              {showTypeMenu && (
-                <div className="homework-type-popover">
-                  {HOMEWORK_TYPE_ITEMS.map((item) => (
-                    <button
-                      key={item.type}
-                      className="homework-type-option"
-                      type="button"
-                      onClick={() => handleCreateHomework(item.type)}
-                      disabled={createLoadingType !== null}
-                    >
-                      {createLoadingType === item.type ? "Создаем..." : item.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        {homeworksList.length === 0 && (
+        {deleteAllError && <div className="auth-error">{deleteAllError}</div>}
+        {canManageLesson ? (
+          <Link
+            className="homework-add-cta"
+            to={`/courses/${courseId}/lessons/${lessonOrder}/homeworks/editor`}
+          >
+            {homeworksList.length === 0 ? "Добавить ДЗ" : "Редактировать ДЗ"}
+          </Link>
+        ) : homeworksList.length > 0 ? (
+          <Link
+            className="homework-add-cta"
+            to={`/courses/${courseId}/lessons/${lessonOrder}/homeworks/solve`}
+          >
+            Решать ДЗ
+          </Link>
+        ) : (
           <div className="muted">Домашние задания пока не добавлены.</div>
         )}
       </div>

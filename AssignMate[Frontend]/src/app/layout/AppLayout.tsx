@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/shared/hooks/useAuth";
 
@@ -80,7 +81,23 @@ function buildCrumbs(pathname: string): Crumb[] {
 
     if (segments[i - 1] === "homeworks") {
       currentPath += `/${segment}`;
-      crumbs.push({ label: `ДЗ ${segment}`, to: currentPath });
+      if (segment === "editor") {
+        crumbs.push({ label: "Редактор ДЗ", to: currentPath });
+      } else if (segment === "solve") {
+        crumbs.push({ label: "Решение ДЗ", to: currentPath });
+      } else {
+        crumbs.push({ label: `ДЗ ${segment}`, to: currentPath });
+      }
+      continue;
+    }
+
+    if (segments[i - 2] === "homeworks" && (segments[i - 1] === "editor" || segments[i - 1] === "solve")) {
+      currentPath += `/${segment}`;
+      if (segment === "review") {
+        crumbs.push({ label: "Итог", to: currentPath });
+      } else {
+        crumbs.push({ label: `ДЗ ${segment}`, to: currentPath });
+      }
       continue;
     }
 
@@ -105,19 +122,37 @@ export function AppLayout() {
   const canViewDashboard = role === "teacher" || role === "admin" || role === "assistant";
   const location = useLocation();
   const crumbs = buildCrumbs(location.pathname);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  const closeMenu = () => setMenuOpen(false);
 
   return (
     <div>
       <nav>
-        <div className="container">
-          <div>
+        <div className="container nav-container">
+          <div className="nav-brand">
             <Link to="/cabinet">AssignMate</Link>
           </div>
-          <div>
-            <Link to="/courses">Мои курсы</Link>
-            <Link to="/cabinet">Личный кабинет</Link>
-            {canViewDashboard && <Link to="/dashboard">Dashboard</Link>}
-            <button className="secondary" onClick={logout}>
+          <button
+            type="button"
+            className="nav-burger"
+            aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((prev) => !prev)}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+          <div className={`nav-links${menuOpen ? " open" : ""}`}>
+            <Link to="/courses" onClick={closeMenu}>Мои курсы</Link>
+            <Link to="/cabinet" onClick={closeMenu}>Личный кабинет</Link>
+            {canViewDashboard && <Link to="/dashboard" onClick={closeMenu}>Dashboard</Link>}
+            <button className="secondary" onClick={() => { closeMenu(); logout(); }}>
               Выйти
             </button>
           </div>

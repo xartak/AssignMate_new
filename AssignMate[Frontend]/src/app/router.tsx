@@ -7,7 +7,13 @@ import { RegisterPage } from "@/features/auth/pages/RegisterPage";
 import { CourseListPage } from "@/features/courses/pages/CourseListPage";
 import { CourseDetailPage } from "@/features/courses/pages/CourseDetailPage";
 import { LessonDetailPage } from "@/features/lessons/pages/LessonDetailPage";
-import { HomeworkDetailPage } from "@/features/assignments/pages/HomeworkDetailPage";
+import { HomeworkRedirect } from "@/features/assignments/pages/HomeworkRedirect";
+import { HomeworkEditorLayout } from "@/features/assignments/editor/HomeworkEditorLayout";
+import { EditorRouter } from "@/features/assignments/editor/EditorRouter";
+import { EditorReviewStep } from "@/features/assignments/editor/EditorReviewStep";
+import { HomeworkSolveLayout } from "@/features/assignments/solve/HomeworkSolveLayout";
+import { SolveQuestionStep } from "@/features/assignments/solve/SolveQuestionStep";
+import { SolveReviewStep } from "@/features/assignments/solve/SolveReviewStep";
 import { DashboardPage } from "@/features/dashboard/pages/DashboardPage";
 import { StudentStatsPage } from "@/features/dashboard/pages/StudentStatsPage";
 import { CabinetPage } from "@/features/cabinet/pages/CabinetPage";
@@ -35,8 +41,26 @@ const router = createBrowserRouter([
       { path: "courses/:courseId", element: <CourseDetailPage /> },
       { path: "courses/:courseId/lessons/:lessonOrder", element: <LessonDetailPage /> },
       {
+        path: "courses/:courseId/lessons/:lessonOrder/homeworks/editor",
+        element: <HomeworkEditorLayout />,
+        children: [
+          { index: true, element: <EditorRouter /> },
+          { path: "review", element: <EditorReviewStep /> },
+          { path: ":homeworkOrder", element: <EditorRouter /> },
+        ],
+      },
+      {
+        path: "courses/:courseId/lessons/:lessonOrder/homeworks/solve",
+        element: <HomeworkSolveLayout />,
+        children: [
+          { index: true, element: <div /> },
+          { path: "review", element: <SolveReviewStep /> },
+          { path: ":homeworkOrder", element: <SolveQuestionStep /> },
+        ],
+      },
+      {
         path: "courses/:courseId/lessons/:lessonOrder/homeworks/:homeworkOrder",
-        element: <HomeworkDetailPage />,
+        element: <HomeworkRedirect />,
       },
       {
         path: "dashboard",
