@@ -64,6 +64,12 @@ export function ChoiceQuestionStep() {
     const courseId = ctx.courseId;
     const lessonOrder = ctx.lessonOrder;
     const order = hw.order;
+    const validOptions = draft.options
+      .filter((o) => o.text.trim())
+      .map(({ text, is_correct }) => ({ text: text.trim(), is_correct }));
+    if (validOptions.length < 2) {
+      return;
+    }
     saveTimer.current = window.setTimeout(async () => {
       setSaving(true);
       setError(null);
@@ -74,7 +80,7 @@ export function ChoiceQuestionStep() {
           max_score: draft.max_score,
           details: {
             shuffle_options: false,
-            options: draft.options.map(({ text, is_correct }) => ({ text, is_correct })),
+            options: validOptions,
           },
         });
       } catch (err) {
@@ -108,7 +114,7 @@ export function ChoiceQuestionStep() {
     setDraft((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
-  const handleModeChange = async (nextType: "SINGLE_CHOICE" | "MULTIPLE_CHOICE") => {
+  const handleModeChange = (nextType: "SINGLE_CHOICE" | "MULTIPLE_CHOICE") => {
     if (draft.type === nextType) return;
     const adjusted: EditorOption[] = nextType === "SINGLE_CHOICE"
       ? draft.options.map((opt, idx) => ({
@@ -117,21 +123,7 @@ export function ChoiceQuestionStep() {
         }))
       : draft.options;
     setDraft({ ...draft, type: nextType, options: adjusted });
-    try {
-      await updateHomework(ctx.courseId, ctx.lessonOrder, hw.order, {
-        title: draft.title,
-        description: draft.description,
-        max_score: draft.max_score,
-        details: {
-          shuffle_options: false,
-          options: adjusted.map(({ text, is_correct }) => ({ text, is_correct })),
-        },
-      });
-      ctx.reload();
-    } catch (err) {
-      const apiError = err as ApiError | null;
-      setError(typeof apiError?.details === "string" ? apiError.details : "Не удалось сменить тип");
-    }
+    setError("Смена типа задания ограничена на сервере — создайте новое задание нужного типа.");
   };
 
   const handleOptionText = (idx: number, text: string) => {

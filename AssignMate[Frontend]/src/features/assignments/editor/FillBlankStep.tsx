@@ -60,6 +60,12 @@ export function FillBlankStep() {
     const courseId = ctx.courseId;
     const lessonOrder = ctx.lessonOrder;
     const order = hw.order;
+    const validBlanks = draft.blanks
+      .filter((b) => b.correct_text.trim())
+      .map((b) => ({ position: b.position, correct_text: b.correct_text.trim() }));
+    if (validBlanks.length === 0 || !draft.text_template.trim()) {
+      return;
+    }
     saveTimer.current = window.setTimeout(async () => {
       setSaving(true);
       setError(null);
@@ -70,7 +76,7 @@ export function FillBlankStep() {
           max_score: draft.max_score,
           details: {
             text_template: draft.text_template,
-            blanks: draft.blanks,
+            blanks: validBlanks,
           },
         });
       } catch (err) {
