@@ -58,84 +58,105 @@ export function DashboardPage() {
         </div>
         <div className="dashboard-stats">
           {!selectedCourseId && (
-            <div className="courses-hero">
+            <div className="courses-hero dashboard-placeholder">
+              <svg
+                className="dashboard-placeholder-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-hidden
+              >
+                <path
+                  d="M4 6h16M4 12h10M4 18h16"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
               <h3>Выберите курс</h3>
-              <p>Выберите курс слева, чтобы посмотреть статистику.</p>
+              <p>
+                Выберите курс слева, чтобы посмотреть статистику и перейти к проверке
+                домашних заданий.
+              </p>
             </div>
           )}
-          {statsState.loading && <Loader label="Загружаем статистику..." />}
-          {statsState.error && <ErrorState error={statsState.error} />}
-          {statsState.data && (
-            <div className="dashboard-course">
-              <div className="courses-hero">
-                <div className="row">
-                  <strong>{statsState.data.title}</strong>
-                </div>
-                <div className="stat-grid">
-                  <div className="stat-card">
-                    <div className="stat-label">Всего студентов</div>
-                    <div className="stat-value">{statsState.data.students_count}</div>
+          {statsState.loading ? <Loader label="Загружаем статистику..." /> : null}
+          {statsState.error ? <ErrorState error={statsState.error} /> : null}
+          {statsState.data ? (() => {
+            const stats = statsState.data;
+            const students = studentsState.data ?? [];
+            return (
+              <div className="dashboard-course">
+                <div className="courses-hero">
+                  <div className="row">
+                    <strong>{stats.title}</strong>
                   </div>
-                  <div className="stat-card">
-                    <div className="stat-label">Всего уроков</div>
-                    <div className="stat-value">{statsState.data.lessons_count}</div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-label">Домашних заданий</div>
-                    <div className="stat-value">{statsState.data.homeworks_count}</div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-label">Максимум баллов</div>
-                    <div className="stat-value">{statsState.data.total_max_score}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="courses-hero">
-                <div className="row space-between">
-                  <div>
-                    <h3>Ученики курса</h3>
-                    <p className="muted">Всего: {statsState.data.students_count}</p>
-                  </div>
-                </div>
-                {studentsState.loading && <Loader label="Загружаем студентов..." />}
-                {studentsState.error && <ErrorState error={studentsState.error} />}
-                {!studentsState.loading && !studentsState.error && studentsState.data.length === 0 && (
-                  <EmptyState label="В этом курсе пока нет студентов." />
-                )}
-                {!studentsState.loading && !studentsState.error && studentsState.data.length > 0 && (
-                  <div className="students-table">
-                    <div className="students-table-header">
-                      <span>Ученик</span>
-                      <span>Email</span>
-                      <span>Выполнено заданий</span>
-                      <span>Балл</span>
+                  <div className="stat-grid">
+                    <div className="stat-card">
+                      <div className="stat-label">Всего студентов</div>
+                      <div className="stat-value">{stats.students_count}</div>
                     </div>
-                    {studentsState.data.map((student) => {
-                      const fullName = `${student.first_name} ${student.last_name}`.trim() || "Без имени";
-                      const studentPath = `/dashboard/courses/${selectedCourseId}/students/${student.student_id}`;
-                      return (
-                        <Link className="students-table-row" to={studentPath} key={student.student_id}>
-                          <span className="students-name">{fullName}</span>
-                          <span className="students-email">{student.email}</span>
-                          <span>
-                            {student.submissions_count} из {statsState.data.homeworks_count}
-                          </span>
-                          <span>{student.score_sum}</span>
-                        </Link>
-                      );
-                    })}
+                    <div className="stat-card">
+                      <div className="stat-label">Всего уроков</div>
+                      <div className="stat-value">{stats.lessons_count}</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-label">Домашних заданий</div>
+                      <div className="stat-value">{stats.homeworks_count}</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-label">Максимум баллов</div>
+                      <div className="stat-value">{stats.total_max_score}</div>
+                    </div>
                   </div>
-                )}
+                </div>
+
+                <div className="courses-hero">
+                  <div className="row space-between">
+                    <div>
+                      <h3>Ученики курса</h3>
+                      <p className="muted">Всего: {stats.students_count}</p>
+                    </div>
+                  </div>
+                  {studentsState.loading ? <Loader label="Загружаем студентов..." /> : null}
+                  {studentsState.error ? <ErrorState error={studentsState.error} /> : null}
+                  {!studentsState.loading && !studentsState.error && students.length === 0 ? (
+                    <EmptyState label="В этом курсе пока нет студентов." />
+                  ) : null}
+                  {!studentsState.loading && !studentsState.error && students.length > 0 ? (
+                    <div className="students-table">
+                      <div className="students-table-header">
+                        <span>Ученик</span>
+                        <span>Email</span>
+                        <span>Выполнено заданий</span>
+                        <span>Балл</span>
+                      </div>
+                      {students.map((student) => {
+                        const fullName = `${student.first_name} ${student.last_name}`.trim() || "Без имени";
+                        const studentPath = `/dashboard/courses/${selectedCourseId}/students/${student.student_id}`;
+                        return (
+                          <Link className="students-table-row" to={studentPath} key={student.student_id}>
+                            <span className="students-name">{fullName}</span>
+                            <span className="students-email">{student.email}</span>
+                            <span>
+                              {student.submissions_count} из {stats.homeworks_count}
+                            </span>
+                            <span>{student.score_sum}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          )}
-          {selectedCourse && !statsState.data && !statsState.loading && !statsState.error && (
+            );
+          })() : null}
+          {selectedCourse && !statsState.data && !statsState.loading && !statsState.error ? (
             <div className="courses-hero">
               <h3>{selectedCourse.title}</h3>
               <p>Статистика будет доступна после загрузки.</p>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

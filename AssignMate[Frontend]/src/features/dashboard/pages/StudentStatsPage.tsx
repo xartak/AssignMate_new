@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { fetchCourseStudentDetail } from "@/features/dashboard/api";
 import { useAsync } from "@/shared/hooks/useAsync";
 import { Loader } from "@/shared/ui/Loader";
@@ -13,6 +13,13 @@ const STATUS_LABELS: Record<string, string> = {
   GRADED: "Оценено",
   NOT_SUBMITTED: "Не сдано",
 };
+
+function statusPillClass(status: string) {
+  if (status === "GRADED") return "status-pill status-pill-success";
+  if (status === "REVISION") return "status-pill status-pill-danger";
+  if (status === "PENDING") return "status-pill status-pill-warning";
+  return "status-pill status-pill-neutral";
+}
 
 export function StudentStatsPage() {
   useEffect(() => {
@@ -31,7 +38,7 @@ export function StudentStatsPage() {
     [courseId, studentId]
   );
 
-  if (statsState.loading) return <Loader />;
+  if (statsState.loading) return <Loader label="Загружаем статистику..." />;
   if (statsState.error) return <ErrorState error={statsState.error} />;
   if (!statsState.data) return <EmptyState label="Нет данных по студенту." />;
 
@@ -46,14 +53,10 @@ export function StudentStatsPage() {
     return formatDateTime(deadline);
   };
 
-  const formatStatus = (status: string) => STATUS_LABELS[status] ?? status;
-
   const formatScore = (status: string, score: number | null) => {
-    if (status === "PENDING") return "на проверке";
-    if (status === "REVISION") return "переделать";
     if (status === "NOT_SUBMITTED") return "—";
     if (status === "GRADED") return score ?? "—";
-    return score ?? "—";
+    return "—";
   };
 
   return (
@@ -102,18 +105,38 @@ export function StudentStatsPage() {
               <span>Срок сдачи</span>
               <span>Статус</span>
               <span>Оценка</span>
+              <span>Действие</span>
             </div>
-            {data.homeworks.map((homework) => (
-              <div className="homeworks-table-row" key={homework.homework_id}>
-                <span>
-                  {homework.lesson_order}. {homework.lesson_title}
-                </span>
-                <span>{homework.title}</span>
-                <span>{formatDeadline(homework.deadline)}</span>
-                <span>{formatStatus(homework.status)}</span>
-                <span>{formatScore(homework.status, homework.score)}</span>
-              </div>
-            ))}
+            {data.homeworks.map((homework) => {
+              const canReview = homework.status !== "NOT_SUBMITTED";
+              const reviewPath = `/dashboard/courses/${courseId}/students/${studentId}/homeworks/${homework.homework_order}`;
+              return (
+                <div className="homeworks-table-row" key={homework.homework_id}>
+                  <span className="homework-lesson">
+                    {homework.lesson_order}. {homework.lesson_title}
+                  </span>
+                  <span className="homework-title">{homework.title}</span>
+                  <span className="homework-deadline">{formatDeadline(homework.deadline)}</span>
+                  <span>
+                    <span className={statusPillClass(homework.status)}>
+                      {STATUS_LABELS[homework.status] ?? homework.status}
+                    </span>
+                  </span>
+                  <span className="homework-score">
+                    {formatScore(homework.status, homework.score)}
+                  </span>
+                  <span>
+                    {canReview ? (
+                      <Link to={reviewPath} className="action-button-link">
+                        Открыть
+                      </Link>
+                    ) : (
+                      <span className="action-button-link disabled">Нет ответа</span>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

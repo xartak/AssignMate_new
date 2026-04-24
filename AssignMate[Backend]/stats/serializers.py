@@ -111,12 +111,14 @@ class CourseStudentStatsSerializer(serializers.Serializer):
 class CourseStudentHomeworkSerializer(serializers.Serializer):
     """Сериализатор задания в разрезе студента курса."""
     homework_id = serializers.IntegerField()
+    homework_order = serializers.IntegerField()
     lesson_order = serializers.IntegerField()
     lesson_title = serializers.CharField()
     title = serializers.CharField()
     deadline = serializers.DateTimeField(allow_null=True)
     status = serializers.CharField()
     score = serializers.IntegerField(allow_null=True)
+    submission_id = serializers.IntegerField(allow_null=True)
 
 
 class CourseStudentDetailSerializer(serializers.Serializer):

@@ -55,12 +55,14 @@ export type CourseStudentStats = {
 
 export type CourseStudentHomework = {
   homework_id: number;
+  homework_order: number;
   lesson_order: number;
   lesson_title: string;
   title: string;
   deadline: string | null;
   status: string;
   score: number | null;
+  submission_id: number | null;
 };
 
 export type CourseStudentDetail = {

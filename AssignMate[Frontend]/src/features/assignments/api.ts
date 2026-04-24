@@ -105,6 +105,17 @@ export function fetchSubmissions(
   );
 }
 
+export function fetchSubmission(
+  courseId: string,
+  lessonOrder: string,
+  homeworkOrder: string,
+  submissionId: string | number
+) {
+  return apiRequest<SubmissionResponse>(
+    `/courses/${courseId}/lessons/${lessonOrder}/homeworks/${homeworkOrder}/submissions/${submissionId}/`
+  );
+}
+
 export function reviewSubmission(
   courseId: string,
   lessonOrder: string,

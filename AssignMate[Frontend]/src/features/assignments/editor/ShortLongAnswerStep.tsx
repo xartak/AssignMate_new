@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { deleteHomework, updateHomework } from "@/features/assignments/api";
-import type { HomeworkResponse } from "@/features/assignments/types";
+import type { AssignmentType, HomeworkResponse } from "@/features/assignments/types";
 import { NumberInput } from "@/shared/ui/NumberInput";
 import type { ApiError } from "@/shared/api/base";
 import type { EditorContext } from "@/features/assignments/editor/HomeworkEditorLayout";
@@ -34,63 +34,89 @@ export function ShortLongAnswerStep() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const saveTimer = useRef<number | null>(null);
-  const initialised = useRef(false);
+  const dirtyRef = useRef(false);
+  const draftRef = useRef<DraftState | null>(draft);
+  const pinnedHwRef = useRef<{ id: number; order: number; type: AssignmentType } | null>(
+    hw ? { id: hw.id, order: hw.order, type: hw.type } : null
+  );
+
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
+  const persist = async (
+    target: { order: number; type: AssignmentType },
+    snapshot: DraftState
+  ): Promise<boolean> => {
+    setSaving(true);
+    setError(null);
+    try {
+      const details =
+        target.type === "SHORT_ANSWER"
+          ? { max_length: snapshot.max_length, case_sensitive: false }
+          : { max_files: snapshot.max_files };
+      await updateHomework(ctx.courseId, ctx.lessonOrder, target.order, {
+        title: snapshot.title,
+        description: snapshot.description,
+        max_score: snapshot.max_score,
+        details,
+      });
+      ctx.reload();
+      return true;
+    } catch (err) {
+      const apiError = err as ApiError | null;
+      const details = apiError?.details;
+      setError(
+        typeof details === "string"
+          ? details
+          : details
+          ? JSON.stringify(details, null, 2)
+          : "Не удалось сохранить"
+      );
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveCurrent = async (): Promise<boolean> => {
+    const snapshot = draftRef.current;
+    const pinned = pinnedHwRef.current;
+    if (!snapshot || !pinned) return true;
+    if (!dirtyRef.current) return true;
+    const ok = await persist({ order: pinned.order, type: pinned.type }, snapshot);
+    if (ok) dirtyRef.current = false;
+    return ok;
+  };
 
   useEffect(() => {
     if (!hw) return;
-    setDraft(extractDraft(hw));
-    initialised.current = false;
-  }, [hw?.id]);
+    if (pinnedHwRef.current && pinnedHwRef.current.id === hw.id && !dirtyRef.current) {
+      setDraft(extractDraft(hw));
+    } else if (!pinnedHwRef.current || pinnedHwRef.current.id !== hw.id) {
+      pinnedHwRef.current = { id: hw.id, order: hw.order, type: hw.type };
+      setDraft(extractDraft(hw));
+      dirtyRef.current = false;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hw?.id, hw?.type]);
 
   useEffect(() => {
-    if (!draft || !hw) return;
-    if (!initialised.current) {
-      initialised.current = true;
-      return;
-    }
-    if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    const courseId = ctx.courseId;
-    const lessonOrder = ctx.lessonOrder;
-    const order = hw.order;
-    const type = hw.type;
-    saveTimer.current = window.setTimeout(async () => {
-      setSaving(true);
-      setError(null);
-      try {
-        const details =
-          type === "SHORT_ANSWER"
-            ? { max_length: draft.max_length, case_sensitive: false }
-            : { max_files: draft.max_files };
-        await updateHomework(courseId, lessonOrder, order, {
-          title: draft.title,
-          description: draft.description,
-          max_score: draft.max_score,
-          details,
-        });
-      } catch (err) {
-        const apiError = err as ApiError | null;
-        const details = apiError?.details;
-        setError(
-          typeof details === "string"
-            ? details
-            : details
-            ? JSON.stringify(details, null, 2)
-            : "Не удалось сохранить"
-        );
-      } finally {
-        setSaving(false);
-      }
-    }, 400);
     return () => {
-      if (saveTimer.current) window.clearTimeout(saveTimer.current);
+      if (dirtyRef.current && pinnedHwRef.current && draftRef.current) {
+        const snapshot = draftRef.current;
+        const pinned = pinnedHwRef.current;
+        dirtyRef.current = false;
+        persist({ order: pinned.order, type: pinned.type }, snapshot);
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft, hw?.id, hw?.type]);
+  }, []);
 
   if (!hw || !draft) return <div className="muted">Задание не найдено.</div>;
 
   const updateDraft = <K extends keyof DraftState>(key: K, value: DraftState[K]) => {
+    dirtyRef.current = true;
     setDraft((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
@@ -99,6 +125,7 @@ export function ShortLongAnswerStep() {
     setDeleting(true);
     setError(null);
     try {
+      dirtyRef.current = false;
       await deleteHomework(ctx.courseId, ctx.lessonOrder, hw.order);
       ctx.reload();
       navigate(`/courses/${ctx.courseId}/lessons/${ctx.lessonOrder}/homeworks/editor/review`);
@@ -109,7 +136,13 @@ export function ShortLongAnswerStep() {
     }
   };
 
-  const goPrev = () => {
+  const handleSave = async () => {
+    await saveCurrent();
+  };
+
+  const goPrev = async () => {
+    const ok = await saveCurrent();
+    if (!ok) return;
     const idx = ctx.homeworks.findIndex((item) => item.order === hw.order);
     if (idx > 0) {
       const prev = ctx.homeworks[idx - 1];
@@ -119,7 +152,9 @@ export function ShortLongAnswerStep() {
     }
   };
 
-  const goNext = () => {
+  const goNext = async () => {
+    const ok = await saveCurrent();
+    if (!ok) return;
     const idx = ctx.homeworks.findIndex((item) => item.order === hw.order);
     const next = ctx.homeworks[idx + 1];
     if (next) {
@@ -195,6 +230,9 @@ export function ShortLongAnswerStep() {
       </div>
 
       {error && <div className="auth-error">{error}</div>}
+      {dirtyRef.current && !saving && (
+        <div className="muted" style={{ fontSize: 12 }}>Есть несохранённые изменения</div>
+      )}
       {saving && <div className="muted" style={{ fontSize: 12 }}>Сохраняем…</div>}
 
       <div className="wizard-footer">
@@ -202,6 +240,9 @@ export function ShortLongAnswerStep() {
         <div className="row" style={{ gap: 10 }}>
           <button type="button" className="danger" onClick={handleDelete} disabled={deleting}>
             {deleting ? "Удаляем…" : "Удалить"}
+          </button>
+          <button type="button" className="secondary" onClick={handleSave} disabled={saving || !dirtyRef.current}>
+            {saving ? "Сохраняем…" : "Сохранить"}
           </button>
           <button type="button" className="primary" onClick={goNext}>
             Сохранить и продолжить

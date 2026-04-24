@@ -16,6 +16,7 @@ import { SolveQuestionStep } from "@/features/assignments/solve/SolveQuestionSte
 import { SolveReviewStep } from "@/features/assignments/solve/SolveReviewStep";
 import { DashboardPage } from "@/features/dashboard/pages/DashboardPage";
 import { StudentStatsPage } from "@/features/dashboard/pages/StudentStatsPage";
+import { SubmissionReviewPage } from "@/features/dashboard/pages/SubmissionReviewPage";
 import { CabinetPage } from "@/features/cabinet/pages/CabinetPage";
 
 const router = createBrowserRouter([
@@ -75,6 +76,14 @@ const router = createBrowserRouter([
         element: (
           <RequireTeacher>
             <StudentStatsPage />
+          </RequireTeacher>
+        ),
+      },
+      {
+        path: "dashboard/courses/:courseId/students/:studentId/homeworks/:homeworkOrder",
+        element: (
+          <RequireTeacher>
+            <SubmissionReviewPage />
           </RequireTeacher>
         ),
       },

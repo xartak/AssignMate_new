@@ -54,6 +54,17 @@ function buildCrumbs(pathname: string): Crumb[] {
         crumbs.push({ label: `Ученик ${segment}`, to: currentPath });
         continue;
       }
+
+      if (segment === "homeworks" && segments[i - 2] === "students") {
+        currentPath += "/homeworks";
+        continue;
+      }
+
+      if (segments[i - 1] === "homeworks" && segments[i - 3] === "students") {
+        currentPath += `/${segment}`;
+        crumbs.push({ label: `Проверка ДЗ ${segment}`, to: currentPath });
+        continue;
+      }
     }
 
     if (segment === "courses") {

@@ -71,16 +71,41 @@ class QuestionOptionSerializer(serializers.ModelSerializer):
     """
     Сериализатор вариантов ответа на задание.
 
+    Поле ``is_correct`` убирается из ответа, если запрашивающий пользователь
+    не имеет права редактировать курс (студент и т.п.). Контроль — в
+    ``to_representation`` на основе ``request`` из контекста.
+
     Attributes:
         id: Идентификатор варианта ответа.
         text: Текст варианта ответа.
+        is_correct: Признак корректного ответа (только для авторов курса).
     """
 
     class Meta:
         """Конфигурация сериализатора вариантов ответа."""
         model = QuestionOption
-        fields = ["id", "text"]
+        fields = ["id", "text", "is_correct"]
         read_only_fields = ["id"]
+
+    def to_representation(self, instance):
+        """Скрывает ``is_correct`` для пользователей без прав редактирования.
+
+        Args:
+            instance: Экземпляр варианта ответа.
+
+        Returns:
+            dict: Сериализованные данные варианта ответа.
+        """
+        from courses.policies import LessonPolicy
+
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+        user = getattr(request, "user", None) if request is not None else None
+        course = getattr(instance.assignment.lesson, "course", None)
+        allowed = bool(user and course and LessonPolicy.can_edit(user, course))
+        if not allowed:
+            data.pop("is_correct", None)
+        return data
 
 
 class QuestionOptionWriteSerializer(serializers.Serializer):

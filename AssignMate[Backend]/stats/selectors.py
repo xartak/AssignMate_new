@@ -436,19 +436,23 @@ def course_student_detail_stats(course, student):
             except ObjectDoesNotExist:
                 review = None
             score = review.score if review else None
+            submission_id = submission.id
         else:
             status = "NOT_SUBMITTED"
             score = None
+            submission_id = None
 
         homeworks_stats.append(
             {
                 "homework_id": homework.id,
+                "homework_order": homework.order,
                 "lesson_order": homework.lesson.order,
                 "lesson_title": homework.lesson.title,
                 "title": homework.title,
                 "deadline": homework.deadline,
                 "status": status,
                 "score": score,
+                "submission_id": submission_id,
             }
         )
 
