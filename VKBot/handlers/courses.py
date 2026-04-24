@@ -76,16 +76,20 @@ async def _render_courses(
         return
 
     template = courses_carousel(response.results)
-    nav = paginator_keyboard(
-        page=page,
-        has_prev=response.has_previous,
-        has_next=response.has_next,
-    )
+    # VK запрещает одновременно template и keyboard в одном сообщении —
+    # шлём карусель отдельно, затем (если есть пагинация) — клавиатуру.
     await message.answer(
         f"📚 Доступные курсы (страница {page}). Выберите карточку:",
         template=template,
-        keyboard=nav,
     )
+    if response.has_previous or response.has_next:
+        nav = paginator_keyboard(
+            entity="courses",
+            page=page,
+            has_prev=response.has_previous,
+            has_next=response.has_next,
+        )
+        await message.answer("Навигация по страницам:", keyboard=nav)
 
 
 @labeler.message(text=["📚 Курсы", "Курсы", "/курсы"])
