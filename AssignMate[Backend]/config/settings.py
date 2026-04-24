@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'assignments.apps.AssignmentsConfig',
     'stats.apps.StatsConfig',
     'telegram.apps.TelegramConfig',
+    'vk.apps.VkConfig',
 ]
 
 
@@ -148,3 +149,6 @@ CSRF_TRUSTED_ORIGINS = env.list('BACKEND_CSRF_TRUSTED_ORIGINS')
 TELEGRAM_BOT_TOKEN = env('BACKEND_TELEGRAM_BOT_TOKEN')
 TELEGRAM_BOT_USERNAME = env('BACKEND_TELEGRAM_BOT_USERNAME')
 BOT_SERVICE_TOKEN = env('BACKEND_TELEGRAM_BOT_SERVICE_TOKEN')
+
+VK_GROUP_SCREEN_NAME = env('BACKEND_VK_GROUP_SCREEN_NAME', default='')
+VK_BOT_SERVICE_TOKEN = env('BACKEND_VK_BOT_SERVICE_TOKEN', default='')

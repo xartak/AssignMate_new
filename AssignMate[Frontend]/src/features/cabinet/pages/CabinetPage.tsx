@@ -1,6 +1,7 @@
 import { useEffect, useState, type ChangeEvent } from "react";
 import { fetchMe, updateMe, type MeResponse } from "@/features/auth/api";
 import { generateTelegramLink, type TelegramLinkResponse } from "@/features/telegram/api";
+import { generateVKCode, type VKCodeResponse } from "@/features/vk/api";
 import { resolveFileUrl } from "@/shared/api/base";
 import { useAsync } from "@/shared/hooks/useAsync";
 import { Loader } from "@/shared/ui/Loader";
@@ -17,6 +18,10 @@ export function CabinetPage() {
   const [telegramLink, setTelegramLink] = useState<TelegramLinkResponse | null>(null);
   const [telegramLoading, setTelegramLoading] = useState(false);
   const [telegramError, setTelegramError] = useState<string | null>(null);
+  const [vkCode, setVkCode] = useState<VKCodeResponse | null>(null);
+  const [vkLoading, setVkLoading] = useState(false);
+  const [vkError, setVkError] = useState<string | null>(null);
+  const [vkCopied, setVkCopied] = useState(false);
   const [formValues, setFormValues] = useState({
     first_name: "",
     last_name: "",
@@ -166,6 +171,42 @@ export function CabinetPage() {
     await handleGenerateTelegramLink();
   };
 
+  const handleGenerateVKCode = async () => {
+    setVkLoading(true);
+    setVkError(null);
+    setVkCopied(false);
+    try {
+      const data = await generateVKCode();
+      setVkCode(data);
+    } catch (err) {
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Не удалось получить код для ВКонтакте.";
+      setVkError(message);
+    } finally {
+      setVkLoading(false);
+    }
+  };
+
+  const handleCopyVKCode = async () => {
+    if (!vkCode?.code) return;
+    try {
+      await navigator.clipboard.writeText(vkCode.code);
+      setVkCopied(true);
+      window.setTimeout(() => setVkCopied(false), 1500);
+    } catch {
+      setVkCopied(false);
+    }
+  };
+
+  const isVKConnected = Boolean(profile.vk_connected);
+  const vkExpiresAt = vkCode?.expires_at ? new Date(vkCode.expires_at) : null;
+  const vkExpiresLabel =
+    vkExpiresAt && !Number.isNaN(vkExpiresAt.getTime())
+      ? vkExpiresAt.toLocaleString()
+      : vkCode?.expires_at ?? "";
+
   return (
     <div className="cabinet-page">
       <div className="page-header">
@@ -173,28 +214,86 @@ export function CabinetPage() {
           <h1>Личный кабинет</h1>
           <p>Ваши личные данные</p>
         </div>
-          <div className="cabinet-telegram">
-            <div className="cabinet-telegram-title">Telegram</div>
-            {!isTelegramConnected && telegramError && <div className="auth-error">{telegramError}</div>}
-            {!isTelegramConnected && (
-              <div className="form-actions end">
-                <button
-                  className={telegramButtonClass}
-                  type="button"
-                  onClick={handleTelegramAction}
-                  disabled={telegramLoading}
-                >
-                  {telegramLoading ? "Создание..." : telegramButtonLabel}
-                </button>
-              </div>
-            )}
-            {isTelegramConnected ? (
-              <p className="telegram-status">Telegram привязан</p>
-            ) : (
-              <p className="muted">
-                Привяжите Telegram, чтобы получать уведомления и просматривать курсы.
-              </p>
-            )}
+          <div className="cabinet-socials">
+            <div className="cabinet-telegram">
+              <div className="cabinet-telegram-title">Telegram</div>
+              {!isTelegramConnected && telegramError && (
+                <div className="auth-error">{telegramError}</div>
+              )}
+              {!isTelegramConnected && (
+                <div className="form-actions end">
+                  <button
+                    className={telegramButtonClass}
+                    type="button"
+                    onClick={handleTelegramAction}
+                    disabled={telegramLoading}
+                  >
+                    {telegramLoading ? "Создание..." : telegramButtonLabel}
+                  </button>
+                </div>
+              )}
+              {isTelegramConnected ? (
+                <p className="telegram-status">Telegram привязан</p>
+              ) : (
+                <p className="muted">
+                  Привяжите Telegram, чтобы получать уведомления и просматривать курсы.
+                </p>
+              )}
+            </div>
+
+            <div className="cabinet-telegram cabinet-vk">
+              <div className="cabinet-telegram-title">ВКонтакте</div>
+              {!isVKConnected && vkError && (
+                <div className="auth-error">{vkError}</div>
+              )}
+              {isVKConnected ? (
+                <p className="telegram-status">ВКонтакте привязан</p>
+              ) : vkCode ? (
+                <div className="vk-code-block">
+                  <div className="vk-code-row">
+                    <code className="vk-code">{vkCode.code}</code>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={handleCopyVKCode}
+                    >
+                      {vkCopied ? "Скопировано" : "Копировать"}
+                    </button>
+                  </div>
+                  <p className="muted">
+                    Отправьте этот код в сообщения сообщества ВКонтакте.
+                    {vkExpiresLabel && ` Действует до ${vkExpiresLabel}.`}
+                  </p>
+                  {vkCode.group_link && (
+                    <a
+                      className="auth-button telegram-button active"
+                      href={vkCode.group_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Открыть сообщество
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="form-actions end">
+                    <button
+                      className="auth-button telegram-button"
+                      type="button"
+                      onClick={handleGenerateVKCode}
+                      disabled={vkLoading}
+                    >
+                      {vkLoading ? "Создание..." : "Привязать ВКонтакте"}
+                    </button>
+                  </div>
+                  <p className="muted">
+                    Получите код и отправьте его боту сообщества, чтобы привязать
+                    аккаунт.
+                  </p>
+                </>
+              )}
+            </div>
           </div>
       </div>
 

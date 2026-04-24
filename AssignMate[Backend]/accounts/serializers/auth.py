@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from telegram.models import TelegramConnection
+from vk.models import VKConnection
 
 User = get_user_model()
 
@@ -215,6 +216,7 @@ class UserMeSerializer(serializers.ModelSerializer):
     Сериализатор данных текущего пользователя.
     """
     telegram_connected = serializers.SerializerMethodField()
+    vk_connected = serializers.SerializerMethodField()
 
     class Meta:
         """Конфигурация сериализатора пользователя.
@@ -236,11 +238,15 @@ class UserMeSerializer(serializers.ModelSerializer):
             "contact_method",
             "role",
             "telegram_connected",
+            "vk_connected",
         ]
         read_only_fields = fields
 
     def get_telegram_connected(self, obj):
         return TelegramConnection.objects.filter(user=obj, is_active=True).exists()
+
+    def get_vk_connected(self, obj):
+        return VKConnection.objects.filter(user=obj, is_active=True).exists()
 
 
 class UserMeUpdateSerializer(serializers.ModelSerializer):

@@ -15,6 +15,7 @@ urlpatterns = [
     path('api/v1/', include('accounts.urls')),
 
     path('api/v1/', include('telegram.urls')),
+    path('api/v1/', include('vk.urls')),
 
     path('api/v1/', include('rest_framework.urls', namespace='rest_framework')),
 ] + debug_toolbar_urls()

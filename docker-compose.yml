@@ -65,3 +65,24 @@ services:
     depends_on:
       - tg_bot_db
       - backend
+
+  vk_bot_db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${VK_BOT_DATABASE__NAME}
+      POSTGRES_USER: ${VK_BOT_DATABASE__USER}
+      POSTGRES_PASSWORD: ${VK_BOT_DATABASE__PASSWORD}
+    volumes:
+      - ./DockerVolumes/vk-bot-db-data:/var/lib/postgresql/data
+    ports:
+      - "${VK_BOT_DATABASE__EXTERNAL_PORT}:${VK_BOT_DATABASE__INTERNAL_PORT}"
+
+  vk_bot:
+    build:
+      context: ./VKBot
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    depends_on:
+      - vk_bot_db
+      - backend
