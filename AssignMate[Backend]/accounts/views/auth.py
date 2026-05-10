@@ -36,6 +36,7 @@ class RegisterAPIView(APIView):
         Returns:
             Response: Ответ с токенами и профилем пользователя.
         """
+        print(request.data)
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
@@ -127,8 +128,14 @@ class MeAPIView(APIView):
         Returns:
             Response: Сериализованный профиль пользователя.
         """
-        serializer = UserMeSerializer(request.user, context={"request": request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        serializer = UserMeSerializer(
+            request.user,
+            context={"request": request},
+        )
+        return Response(
+            serializer.data,
+            status=status.HTTP_200_OK,
+        )
 
     def patch(self, request):
         """
@@ -147,5 +154,11 @@ class MeAPIView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        response_serializer = UserMeSerializer(user, context={"request": request})
-        return Response(response_serializer.data, status=status.HTTP_200_OK)
+        response_serializer = UserMeSerializer(
+            user,
+            context={"request": request},
+        )
+        return Response(
+            response_serializer.data,
+            status=status.HTTP_200_OK,
+        )

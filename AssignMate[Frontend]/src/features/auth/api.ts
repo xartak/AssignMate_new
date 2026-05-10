@@ -28,6 +28,7 @@ export type RegisterPayload = {
   last_name: string;
   password: string;
   password_confirm: string;
+  role: string;
 };
 
 export type RegisterResponse = LoginResponse;
@@ -56,10 +57,7 @@ export function login(payload: LoginPayload) {
 export function register(payload: RegisterPayload) {
   return apiRequest<RegisterResponse>("/auth/register/", {
     method: "POST",
-    json: {
-      ...payload,
-      role: "STUDENT",
-    },
+    json: payload,
   });
 }
 

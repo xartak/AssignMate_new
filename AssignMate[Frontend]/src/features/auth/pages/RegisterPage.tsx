@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { ROLES } from "@/constants/roles";
 import { register } from "@/features/auth/api";
 import { useAuth } from "@/shared/hooks/useAuth";
 import { formatAuthError } from "@/features/auth/utils";
@@ -10,6 +11,7 @@ export function RegisterPage() {
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [role, setRole] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -30,6 +32,7 @@ export function RegisterPage() {
         last_name: lastName,
         password,
         password_confirm: passwordConfirm,
+        role,
       });
       setAuth({
         token: data.access,
@@ -96,6 +99,22 @@ export function RegisterPage() {
                 onChange={(event) => setLastName(event.target.value)}
                 required
               />
+            </div>
+            <div>
+              <label htmlFor="role">Роль</label>
+              <select
+                id="role"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                required
+              >
+                <option value="" disabled>Выберите роль</option>
+                {ROLES.map(({ value, label }) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label htmlFor="password">Пароль</label>
