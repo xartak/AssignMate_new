@@ -7,6 +7,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from accounts.models import ParentStudent, User
 from accounts.serializers import (
     RegisterSerializer,
     JWTLoginSerializer,
@@ -36,10 +37,16 @@ class RegisterAPIView(APIView):
         Returns:
             Response: Ответ с токенами и профилем пользователя.
         """
-        print(request.data)
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+        if serializer.data.get("role") == "ADMIN" or serializer.data.get("role") == "Admin":
+            return Response(
+                {
+                    "detail": "Роль Админитратора нельзя получить.",
+                },
+                status=status.HTTP_200_OK,
+            )
 
         refresh = RefreshToken.for_user(user)
 
@@ -162,3 +169,90 @@ class MeAPIView(APIView):
             response_serializer.data,
             status=status.HTTP_200_OK,
         )
+
+
+class ParentChildrenAPIView(APIView):
+    """
+    API для управления связями родитель-ребёнок.
+
+    Endpoints:
+        GET  /api/v1/auth/children/          
+        POST /api/v1/auth/children/         
+        DELETE /api/v1/auth/children/<id>/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def _check_parent(self, user):
+        if not user.is_parent:
+            return Response(
+                {"detail": "Доступно только для родителей."}, 
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return None
+
+    def get(self, request):
+        err = self._check_parent(request.user)
+        if err:
+            return err
+        links = ParentStudent.objects.filter(parent=request.user).select_related("student")
+        data = [
+            {
+                "id": link.id,
+                "student_id": link.student.id,
+                "email": link.student.email,
+                "first_name": link.student.first_name,
+                "last_name": link.student.last_name,
+            }
+            for link in links
+        ]
+        return Response(data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        err = self._check_parent(request.user)
+        if err:
+            return err
+        email = request.data.get("email", "").strip()
+        if not email:
+            return Response(
+                {"detail": "Укажите email ученика."}, 
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        student = User.objects.filter(email__iexact=email).first()
+        if not student:
+            return Response(
+                {"detail": "Пользователь не найден."}, 
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not student.is_student:
+            return Response(
+                {"detail": "Пользователь не является учеником."}, 
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        link, created = ParentStudent.objects.get_or_create(
+            parent=request.user, 
+            student=student,
+            )
+        data = {
+            "id": link.id,
+            "student_id": student.id,
+            "email": student.email,
+            "first_name": student.first_name,
+            "last_name": student.last_name,
+        }
+        return Response(
+            data, 
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    def delete(self, request, link_id=None):
+        err = self._check_parent(request.user)
+        if err:
+            return err
+        from django.shortcuts import get_object_or_404
+        link = get_object_or_404(
+            ParentStudent, 
+            id=link_id, 
+            parent=request.user,
+        )
+        link.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

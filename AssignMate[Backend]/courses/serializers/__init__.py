@@ -9,5 +9,5 @@ from .lessons import (
     LessonUpdateSerializer,
 )
 from .enrollment import EnrollmentSerializer
-from .coursestaff import CourseStaffSerializer
+from .coursestaff import CourseStaffSerializer, AssistantPermissionsSerializer
 from .invitations import CourseInviteCodeSerializer, CourseJoinSerializer

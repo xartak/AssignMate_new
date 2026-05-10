@@ -57,6 +57,25 @@ def is_course_staff(user, course, *, roles: list[str] | tuple[str, ...]) -> bool
     ).exists()
 
 
+def get_assistant_staff(user, course):
+    """Возвращает запись CourseStaff ассистента курса или None.
+
+    Args:
+        user: Пользователь.
+        course: Курс.
+
+    Returns:
+        CourseStaff | None: Запись staff, если пользователь является ассистентом курса.
+    """
+    if not is_authenticated(user) or not getattr(user, "is_assistant", False):
+        return None
+    return CourseStaff.objects.filter(
+        course=course,
+        user=user,
+        role=CourseStaffRole.ASSISTANT,
+    ).first()
+
+
 def is_student_enrolled(user, course) -> bool:
     """Проверяет активное зачисление студента на курс.
 
@@ -205,14 +224,16 @@ class LessonPolicy:
         Returns:
             bool: True, если пользователь может создавать уроки.
         """
-        return bool(
-            is_authenticated(user)
-            and (getattr(user, "is_admin", False) or course.author_id == user.id)
-        )
+        if not is_authenticated(user):
+            return False
+        if getattr(user, "is_admin", False) or course.author_id == user.id:
+            return True
+        staff = get_assistant_staff(user, course)
+        return bool(staff and staff.can_add_materials)
 
     @staticmethod
     def can_edit(user, course) -> bool:
-        """Проверяет право редактирования урока в курсе.
+        """Проверяет право редактирования урока в курсе (включая добавление материалов).
 
         Args:
             user: Пользователь.
@@ -221,13 +242,12 @@ class LessonPolicy:
         Returns:
             bool: True, если пользователь может редактировать урок.
         """
-        return bool(
-            is_authenticated(user)
-            and (
-                getattr(user, "is_admin", False)
-                or course.author_id == user.id
-            )
-        )
+        if not is_authenticated(user):
+            return False
+        if getattr(user, "is_admin", False) or course.author_id == user.id:
+            return True
+        staff = get_assistant_staff(user, course)
+        return bool(staff and staff.can_add_materials)
 
     @staticmethod
     def can_delete(user, course) -> bool:

@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchLesson, fetchHomeworks } from "@/features/lessons/api";
 import { deleteLesson, fetchCourse, fetchLessons, updateLesson } from "@/features/courses/api";
 import { useAsync } from "@/shared/hooks/useAsync";
@@ -10,6 +10,7 @@ import { deleteHomework } from "@/features/assignments/api";
 import type { ApiError } from "@/shared/api/base";
 import { resolveFileUrl } from "@/shared/api/base";
 import { useAuth } from "@/shared/hooks/useAuth";
+import { useAssistantPermissions } from "@/shared/hooks/useAssistantPermissions";
 import { NumberInput } from "@/shared/ui/NumberInput";
 import type { Lesson } from "@/shared/api/types";
 import {
@@ -37,12 +38,21 @@ export function LessonDetailPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [deleteAllLoading, setDeleteAllLoading] = useState(false);
   const [deleteAllError, setDeleteAllError] = useState<string | null>(null);
+  const [hwModalOpen, setHwModalOpen] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     document.body.classList.add("theme-purple");
     return () => {
       document.body.classList.remove("theme-purple");
     };
   }, []);
+
+  useEffect(() => {
+    if (!hwModalOpen) return;
+    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") setHwModalOpen(false); };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [hwModalOpen]);
 
   useEffect(() => {
     if (!lessonState.data) return;
@@ -64,7 +74,11 @@ export function LessonDetailPage() {
 
   const isAdmin = role === "admin";
   const isAuthor = courseState.data?.author === userId;
-  const canManageLesson = isAdmin || (role === "teacher" && isAuthor);
+  const { perms: assistantPerms } = useAssistantPermissions(courseId);
+  const canManageLesson =
+    isAdmin ||
+    (role === "teacher" && isAuthor) ||
+    (role === "assistant" && assistantPerms.can_add_materials);
   const lessonsList = lessonsNavState.data ?? [];
   const currentOrder = Number(lessonOrder);
   const currentIndex = lessonsList.findIndex((lesson) => lesson.order === currentOrder);
@@ -312,7 +326,7 @@ export function LessonDetailPage() {
         <div className="homework-manage-header">
           <div>
             <h3>Домашние задания</h3>
-            <p className="muted">Выберите номер задания или добавьте новое.</p>
+            <p className="muted">Нажмите на группу, чтобы выбрать задание.</p>
           </div>
           <div className="row">
             <span className="meta-pill">Максимальный балл: {totalMaxScore}</span>
@@ -330,24 +344,63 @@ export function LessonDetailPage() {
         </div>
         {Boolean(homeworksState.error) && <ErrorState error={homeworksState.error} />}
         {deleteAllError && <div className="auth-error">{deleteAllError}</div>}
-        {canManageLesson ? (
+        {canManageLesson && (
           <Link
             className="homework-add-cta"
             to={`/courses/${courseId}/lessons/${lessonOrder}/homeworks/editor`}
           >
             {homeworksList.length === 0 ? "Добавить ДЗ" : "Редактировать ДЗ"}
           </Link>
-        ) : homeworksList.length > 0 ? (
-          <Link
-            className="homework-add-cta"
-            to={`/courses/${courseId}/lessons/${lessonOrder}/homeworks/solve`}
-          >
-            Решать ДЗ
-          </Link>
-        ) : (
+        )}
+        {homeworksList.length === 0 ? (
           <div className="muted">Домашние задания пока не добавлены.</div>
+        ) : (
+          <button
+            type="button"
+            className="hw-group-card"
+            onClick={() => setHwModalOpen(true)}
+          >
+            <div className="hw-group-card-left">
+              <span className="hw-group-card-icon">📋</span>
+              <div>
+                <div className="hw-group-card-title">Задания урока</div>
+                <div className="hw-group-card-meta">{homeworksList.length} задани{homeworksList.length === 1 ? "е" : homeworksList.length < 5 ? "я" : "й"} · {totalMaxScore} б.</div>
+              </div>
+            </div>
+            <span className="hw-group-card-arrow">→</span>
+          </button>
         )}
       </div>
+
+      {hwModalOpen && (
+        <div className="hw-modal-overlay" onClick={() => setHwModalOpen(false)}>
+          <div
+            className="hw-modal"
+            ref={modalRef}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="hw-modal-header">
+              <h3>Задания урока</h3>
+              <button type="button" className="hw-modal-close" onClick={() => setHwModalOpen(false)}>✕</button>
+            </div>
+            <div className="hw-modal-list">
+              {homeworksList.map((hw) => (
+                <Link
+                  key={hw.order}
+                  className="homework-accordion-item"
+                  to={`/courses/${courseId}/lessons/${lessonOrder}/homeworks/${hw.order}`}
+                  onClick={() => setHwModalOpen(false)}
+                >
+                  <span className="homework-accordion-order">#{hw.order}</span>
+                  <span className="homework-accordion-title">{hw.title}</span>
+                  <span className="homework-accordion-score">{hw.max_score} б.</span>
+                  <span className="homework-accordion-arrow">→</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

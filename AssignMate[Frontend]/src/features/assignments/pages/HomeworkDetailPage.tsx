@@ -32,6 +32,7 @@ import { FillBlankForm } from "@/features/assignments/forms/FillBlankForm";
 import { ShortAnswerForm } from "@/features/assignments/forms/ShortAnswerForm";
 import { LongAnswerForm } from "@/features/assignments/forms/LongAnswerForm";
 import { useAuth } from "@/shared/hooks/useAuth";
+import { useAssistantPermissions } from "@/shared/hooks/useAssistantPermissions";
 import { formatDateTime } from "@/shared/utils/date";
 import type { ApiError } from "@/shared/api/base";
 import {
@@ -409,19 +410,25 @@ export function HomeworkDetailPage() {
   }, [homeworkState.data]);
 
   const isStudent = role === "student";
+  const isParent = role === "parent";
+  const isAssistant = role === "assistant";
+  const { perms: assistantPerms } = useAssistantPermissions(courseId);
   const studentSubmission = useMemo(() => {
-    if (!isStudent || !submissionsState.data || submissionsState.data.length === 0) {
+    if ((!isStudent && !isParent) || !submissionsState.data || submissionsState.data.length === 0) {
       return null;
     }
     return [...submissionsState.data].sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )[0];
-  }, [isStudent, submissionsState.data]);
+  }, [isStudent, isParent, submissionsState.data]);
   const displaySubmission = lastSubmission ?? studentSubmission;
   const canEdit = isStudent && (!displaySubmission || displaySubmission.status === "REVISION");
   const canSubmit = canEdit;
   const homeworksList = homeworksNavState.data ?? [];
-  const canManageHomework = role === "admin" || (role === "teacher" && courseState.data?.author === userId);
+  const canManageHomework =
+    role === "admin" ||
+    (role === "teacher" && courseState.data?.author === userId) ||
+    (isAssistant && (assistantPerms.can_edit_homework || assistantPerms.can_add_homework));
   const steps = homeworksList.length > 0 ? homeworksList : homeworkState.data ? [homeworkState.data] : [];
   const totalMaxScore = steps.reduce((sum, item) => sum + (item.max_score ?? 0), 0);
   const courseTitle = courseState.data?.title ?? `Курс ${courseId}`;
@@ -800,6 +807,12 @@ export function HomeworkDetailPage() {
                 renderStudentSubmission(homeworkState.data, displaySubmission)
               ) : (
                 <div className="muted">Ответ не найден.</div>
+              )
+            ) : isParent ? (
+              displaySubmission ? (
+                renderStudentSubmission(homeworkState.data, displaySubmission)
+              ) : (
+                <div className="muted">Ответ ещё не отправлен.</div>
               )
             ) : (
               <div className="muted">Решение домашнего задания доступно только студентам.</div>

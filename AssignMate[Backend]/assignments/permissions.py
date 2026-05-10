@@ -48,7 +48,7 @@ class CanCreateHomework(permissions.BasePermission):
             bool: True, если создание разрешено.
         """
         course = view.get_course()
-        return LessonPolicy.can_edit(request.user, course)
+        return HomeworkPolicy.can_edit(request.user, course)
 
 
 class CanEditHomework(permissions.BasePermission):
@@ -77,7 +77,7 @@ class CanEditHomework(permissions.BasePermission):
         Returns:
             bool: True, если редактирование разрешено.
         """
-        return LessonPolicy.can_edit(request.user, obj.lesson.course)
+        return HomeworkPolicy.can_edit(request.user, obj.lesson.course)
 
 
 class CanDeleteHomework(permissions.BasePermission):
@@ -106,7 +106,7 @@ class CanDeleteHomework(permissions.BasePermission):
         Returns:
             bool: True, если удаление разрешено.
         """
-        return LessonPolicy.can_delete(request.user, obj.lesson.course)
+        return HomeworkPolicy.can_edit(request.user, obj.lesson.course)
 
 
 class CanSubmitHomework(permissions.BasePermission):

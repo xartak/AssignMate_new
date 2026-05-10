@@ -17,6 +17,8 @@ import { SolveReviewStep } from "@/features/assignments/solve/SolveReviewStep";
 import { DashboardPage } from "@/features/dashboard/pages/DashboardPage";
 import { StudentStatsPage } from "@/features/dashboard/pages/StudentStatsPage";
 import { SubmissionReviewPage } from "@/features/dashboard/pages/SubmissionReviewPage";
+import { MyStatsPage } from "@/features/dashboard/pages/MyStatsPage";
+import { StudentDashboardPage } from "@/features/dashboard/pages/StudentDashboardPage";
 import { CabinetPage } from "@/features/cabinet/pages/CabinetPage";
 
 const router = createBrowserRouter([
@@ -40,6 +42,8 @@ const router = createBrowserRouter([
       { path: "courses", element: <CourseListPage /> },
       { path: "cabinet", element: <CabinetPage /> },
       { path: "courses/:courseId", element: <CourseDetailPage /> },
+      { path: "courses/:courseId/my-stats", element: <MyStatsPage /> },
+      { path: "student-dashboard", element: <StudentDashboardPage /> },
       { path: "courses/:courseId/lessons/:lessonOrder", element: <LessonDetailPage /> },
       {
         path: "courses/:courseId/lessons/:lessonOrder/homeworks/editor",

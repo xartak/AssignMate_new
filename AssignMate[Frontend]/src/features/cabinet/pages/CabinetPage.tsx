@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent } from "react";
-import { fetchMe, updateMe, type MeResponse } from "@/features/auth/api";
+import { fetchMe, updateMe, fetchChildren, addChild, removeChild, type MeResponse, type ChildLink } from "@/features/auth/api";
 import { generateTelegramLink, type TelegramLinkResponse } from "@/features/telegram/api";
 import { generateVKCode, type VKCodeResponse } from "@/features/vk/api";
 import { resolveFileUrl } from "@/shared/api/base";
@@ -30,6 +30,11 @@ export function CabinetPage() {
     bio: "",
     contact_method: "",
   });
+  const [children, setChildren] = useState<ChildLink[]>([]);
+  const [childrenLoaded, setChildrenLoaded] = useState(false);
+  const [childEmail, setChildEmail] = useState("");
+  const [childLoading, setChildLoading] = useState(false);
+  const [childError, setChildError] = useState<string | null>(null);
 
   useEffect(() => {
     document.body.classList.add("theme-purple");
@@ -49,6 +54,9 @@ export function CabinetPage() {
       bio: meState.data.bio ?? "",
       contact_method: meState.data.contact_method ?? "",
     });
+    if (meState.data.role === "PARENT" || meState.data.role === "parent") {
+      fetchChildren().then(setChildren).finally(() => setChildrenLoaded(true));
+    }
   }, [meState.data]);
 
   if (meState.loading) return <Loader />;
@@ -197,6 +205,37 @@ export function CabinetPage() {
       window.setTimeout(() => setVkCopied(false), 1500);
     } catch {
       setVkCopied(false);
+    }
+  };
+
+  const isParent = (profile.role ?? "").toLowerCase() === "parent";
+
+  const handleAddChild = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!childEmail.trim()) return;
+    setChildLoading(true);
+    setChildError(null);
+    try {
+      const added = await addChild(childEmail.trim());
+      setChildren((prev) => prev.some((c) => c.id === added.id) ? prev : [...prev, added]);
+      setChildEmail("");
+    } catch (error) {
+      const apiError = error as { details?: unknown; message?: string } | null;
+      const detail = apiError?.details ?? apiError?.message;
+      setChildError(typeof detail === "string" ? detail : "Не удалось добавить ученика");
+    } finally {
+      setChildLoading(false);
+    }
+  };
+
+  const handleRemoveChild = async (linkId: number) => {
+    const confirmed = window.confirm("Удалить ученика из списка?");
+    if (!confirmed) return;
+    try {
+      await removeChild(linkId);
+      setChildren((prev) => prev.filter((c) => c.id !== linkId));
+    } catch {
+      setChildError("Не удалось удалить ученика");
     }
   };
 
@@ -421,6 +460,51 @@ export function CabinetPage() {
           )}
         </section>
       </div>
+
+      {isParent && childrenLoaded && (
+        <section className="courses-hero cabinet-children">
+          <h3>Мои ученики</h3>
+          <p className="muted">Добавьте ученика по email, чтобы следить за его успеваемостью.</p>
+          <form className="add-assistant-form" onSubmit={handleAddChild}>
+            <input
+              className="auth-input"
+              type="email"
+              placeholder="Email ученика"
+              value={childEmail}
+              onChange={(e) => setChildEmail(e.target.value)}
+              required
+            />
+            <button className="auth-button" type="submit" disabled={childLoading}>
+              {childLoading ? "Добавляем..." : "Добавить"}
+            </button>
+          </form>
+          {childError && <div className="auth-error">{childError}</div>}
+          {children.length === 0 ? (
+            <div className="muted">Учеников пока нет.</div>
+          ) : (
+            <div className="assistants-permissions">
+              {children.map((child) => {
+                const name = `${child.first_name || ""} ${child.last_name || ""}`.trim() || child.email;
+                return (
+                  <div key={child.id} className="assistant-permissions-row">
+                    <div className="assistant-name">
+                      <strong>{name}</strong>
+                      <span className="muted">{child.email}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="danger small"
+                      onClick={() => handleRemoveChild(child.id)}
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ from .auth import (
     RefreshAPIView,
     LogoutAPIView,
     MeAPIView,
+    ParentChildrenAPIView,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "RefreshAPIView",
     "LogoutAPIView",
     "MeAPIView",
+    "ParentChildrenAPIView",
 ]

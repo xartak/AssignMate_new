@@ -84,3 +84,26 @@ export function logoutRequest(refresh: string) {
     json: { refresh },
   });
 }
+
+export type ChildLink = {
+  id: number;
+  student_id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+};
+
+export function fetchChildren() {
+  return apiRequest<ChildLink[]>("/auth/children/");
+}
+
+export function addChild(email: string) {
+  return apiRequest<ChildLink>("/auth/children/", {
+    method: "POST",
+    json: { email },
+  });
+}
+
+export function removeChild(linkId: number) {
+  return apiRequest(`/auth/children/${linkId}/`, { method: "DELETE" });
+}

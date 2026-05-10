@@ -5,6 +5,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from accounts.models import User
+
 from courses.permissions import (
     CanCreateCourse,
     CanDeleteCourse,
@@ -16,6 +18,9 @@ from courses.permissions import (
 from courses.models import Course
 from common.viewsets import ActionPermissionsMixin, ActionSerializerMixin
 from courses.selectors import courses_for_dashboard
+from courses.models import CourseStaff
+from courses.policies import CoursePolicy, get_assistant_staff
+from courses.choices import CourseStaffRole
 from courses.serializers import (
     CourseReadSerializer,
     CourseCreateSerializer,
@@ -23,6 +28,7 @@ from courses.serializers import (
     CourseInviteCodeSerializer,
     CourseJoinSerializer,
     EnrollmentSerializer,
+    AssistantPermissionsSerializer,
 )
 from courses.services import generate_invite_code, join_course
 from courses.services.exceptions import AlreadyEnrolledError
@@ -149,5 +155,183 @@ class CourseViewSet(ActionPermissionsMixin, ActionSerializerMixin, ModelViewSet)
             Response: Список курсов пользователя.
         """
         queryset = courses_for_dashboard(request.user)
-        serializer = CourseReadSerializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        serializer = CourseReadSerializer(
+            queryset, 
+            many=True,
+        )
+        return Response(
+            serializer.data, 
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["get"], url_path="my-permissions", permission_classes=[IsAuthenticated])
+    def my_permissions(self, request, *args, **kwargs):
+        """
+        Возвращает флаги разрешений текущего ассистента для этого курса.
+
+        Args:
+            request: DRF request.
+            *args: Позиционные аргументы DRF.
+            **kwargs: Именованные аргументы DRF.
+
+        Returns:
+            Response: Флаги разрешений ассистента или 404.
+        """
+        course = self.get_object()
+        staff = get_assistant_staff(request.user, course)
+        if not staff:
+            return Response(
+                {
+                    "can_edit_homework": False, 
+                    "can_review_homework": False, 
+                    "can_add_homework": False, 
+                    "can_add_materials": False,
+                },
+                status=status.HTTP_200_OK,
+            )
+        serializer = AssistantPermissionsSerializer(staff)
+        return Response(
+            serializer.data, 
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["get"], url_path="assistants", permission_classes=[IsAuthenticated])
+    def assistants(self, request, *args, **kwargs):
+        """
+        Возвращает список ассистентов курса с их флагами разрешений.
+        Доступно только автору курса и администратору.
+
+        Args:
+            request: DRF request.
+            *args: Позиционные аргументы DRF.
+            **kwargs: Именованные аргументы DRF.
+
+        Returns:
+            Response: Список ассистентов с флагами.
+        """
+        course = self.get_object()
+        if not CoursePolicy.can_edit(request.user, course):
+            return Response(
+                {"detail": "Нет прав."}, 
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        staff_qs = CourseStaff.objects.filter(
+            course=course,
+            role=CourseStaffRole.ASSISTANT,
+        ).select_related("user")
+        serializer = AssistantPermissionsSerializer(staff_qs, many=True)
+        return Response(
+            serializer.data, 
+            status=status.HTTP_200_OK,
+            )
+
+    @action(detail=True, methods=["post"], url_path="add-assistant", permission_classes=[IsAuthenticated])
+    def add_assistant(self, request, *args, **kwargs):
+        """
+        Добавляет пользователя в качестве ассистента курса по email.
+        Доступно только автору курса и администратору.
+        """
+        course = self.get_object()
+        if not CoursePolicy.can_edit(request.user, course):
+            return Response(
+                {"detail": "Нет прав."}, 
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        email = request.data.get("email", "").strip()
+        if not email:
+            return Response(
+                {"detail": "Укажите email пользователя."}, 
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            return Response(
+                {"detail": "Пользователь не найден."}, 
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not user.is_assistant:
+            return Response(
+                {"detail": "Пользователь не является ассистентом."}, 
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        staff, created = CourseStaff.objects.get_or_create(
+            course=course,
+            user=user,
+            defaults={"role": CourseStaffRole.ASSISTANT},
+        )
+        if not created and staff.role != CourseStaffRole.ASSISTANT:
+            return Response(
+                {"detail": "Пользователь уже состоит в курсе в другой роли."}, 
+                status=status.HTTP_409_CONFLICT,
+            )
+        serializer = AssistantPermissionsSerializer(staff)
+        return Response(
+            serializer.data, 
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["delete"], url_path=r"remove-assistant/(?P<user_id>[0-9]+)", permission_classes=[IsAuthenticated])
+    def remove_assistant(self, request, user_id=None, *args, **kwargs):
+        """
+        Удаляет ассистента из курса.
+        Доступно только автору курса и администратору.
+        """
+        course = self.get_object()
+        if not CoursePolicy.can_edit(request.user, course):
+            return Response(
+                {"detail": "Нет прав."}, 
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        staff = get_object_or_404(
+            CourseStaff, 
+            course=course, 
+            user_id=user_id, 
+            role=CourseStaffRole.ASSISTANT,
+        )
+        staff.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["get", "patch"], url_path=r"staff/(?P<user_id>[0-9]+)/permissions", permission_classes=[IsAuthenticated])
+    def staff_permissions(self, request, user_id=None, *args, **kwargs):
+        """
+        Получает или обновляет флаги разрешений ассистента курса.
+        Доступно только автору курса и администратору.
+
+        Args:
+            request: DRF request.
+            user_id: Идентификатор пользователя-ассистента.
+            *args: Позиционные аргументы DRF.
+            **kwargs: Именованные аргументы DRF.
+
+        Returns:
+            Response: Флаги разрешений ассистента.
+        """
+        course = self.get_object()
+        if not CoursePolicy.can_edit(request.user, course):
+            return Response(
+                {"detail": "Нет прав на управление ассистентами."}, 
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        staff = get_object_or_404(
+            CourseStaff,
+            course=course,
+            user_id=user_id,
+            role=CourseStaffRole.ASSISTANT,
+        )
+        if request.method == "GET":
+            serializer = AssistantPermissionsSerializer(staff)
+            return Response(
+                serializer.data, 
+                status=status.HTTP_200_OK,
+            )
+        serializer = AssistantPermissionsSerializer(
+            staff, 
+            data=request.data, 
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            serializer.data, 
+            status=status.HTTP_200_OK,
+        )

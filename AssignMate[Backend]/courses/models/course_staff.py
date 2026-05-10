@@ -32,6 +32,10 @@ class CourseStaff(TimeStampedModel):
         max_length=20,
         choices=CourseStaffRole,
     )
+    can_edit_homework = models.BooleanField(default=False)
+    can_review_homework = models.BooleanField(default=False)
+    can_add_homework = models.BooleanField(default=False)
+    can_add_materials = models.BooleanField(default=False)
 
     class Meta:
         """Метаданные модели участника курса."""

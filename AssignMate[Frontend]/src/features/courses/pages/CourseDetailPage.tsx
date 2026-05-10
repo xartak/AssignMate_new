@@ -7,6 +7,11 @@ import {
   fetchInviteCode,
   fetchLessons,
   updateCourse,
+  fetchCourseAssistants,
+  updateAssistantPermissions,
+  addCourseAssistant,
+  removeCourseAssistant,
+  type AssistantPermissions,
 } from "@/features/courses/api";
 import { useAsync } from "@/shared/hooks/useAsync";
 import { Loader } from "@/shared/ui/Loader";
@@ -45,6 +50,12 @@ export function CourseDetailPage() {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [assistants, setAssistants] = useState<AssistantPermissions[]>([]);
+  const [assistantsLoading, setAssistantsLoading] = useState(false);
+  const [showAssistants, setShowAssistants] = useState(false);
+  const [addAssistantEmail, setAddAssistantEmail] = useState("");
+  const [addAssistantLoading, setAddAssistantLoading] = useState(false);
+  const [addAssistantError, setAddAssistantError] = useState<string | null>(null);
   useEffect(() => {
     document.body.classList.add("theme-purple");
     return () => {
@@ -80,7 +91,6 @@ export function CourseDetailPage() {
   const isAuthor = courseData.author === userId;
   const canManageCourse = isAdmin || isAuthor;
   const canManageLessons = canManageCourse;
-
   const handleCreateLesson = async (event: React.FormEvent) => {
     event.preventDefault();
     if (lessonMaterialsError) {
@@ -179,6 +189,69 @@ export function CourseDetailPage() {
       setCourseError("Не удалось удалить курс");
     } finally {
       setCourseSaving(false);
+    }
+  };
+
+  const handleShowAssistants = async () => {
+    if (showAssistants) {
+      setShowAssistants(false);
+      return;
+    }
+    setAssistantsLoading(true);
+    try {
+      const data = await fetchCourseAssistants(courseId);
+      setAssistants(data);
+      setShowAssistants(true);
+    } catch {
+      setCourseError("Не удалось загрузить ассистентов");
+    } finally {
+      setAssistantsLoading(false);
+    }
+  };
+
+  const handleTogglePermission = async (
+    userId: number,
+    field: keyof Pick<AssistantPermissions, "can_edit_homework" | "can_review_homework" | "can_add_homework" | "can_add_materials">,
+    value: boolean
+  ) => {
+    try {
+      const updated = await updateAssistantPermissions(courseId, userId, { [field]: value });
+      setAssistants((prev) => prev.map((a) => (a.user_id === userId ? { ...a, ...updated } : a)));
+    } catch {
+      setCourseError("Не удалось обновить права");
+    }
+  };
+
+  const handleAddAssistant = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!addAssistantEmail.trim()) return;
+    setAddAssistantLoading(true);
+    setAddAssistantError(null);
+    try {
+      const added = await addCourseAssistant(courseId, addAssistantEmail.trim());
+      setAssistants((prev) =>
+        prev.some((a) => a.user_id === added.user_id) ? prev : [...prev, added]
+      );
+      setAddAssistantEmail("");
+    } catch (error) {
+      const apiError = error as { details?: unknown; message?: string } | null;
+      const detail = apiError?.details ?? apiError?.message;
+      setAddAssistantError(
+        typeof detail === "string" ? detail : "Не удалось добавить ассистента"
+      );
+    } finally {
+      setAddAssistantLoading(false);
+    }
+  };
+
+  const handleRemoveAssistant = async (assistantUserId: number) => {
+    const confirmed = window.confirm("Удалить ассистента из курса?");
+    if (!confirmed) return;
+    try {
+      await removeCourseAssistant(courseId, assistantUserId);
+      setAssistants((prev) => prev.filter((a) => a.user_id !== assistantUserId));
+    } catch {
+      setCourseError("Не удалось удалить ассистента");
     }
   };
 
@@ -320,6 +393,77 @@ export function CourseDetailPage() {
             {inviteCode && <span className="course-tag">{inviteCode}</span>}
           </div>
           {inviteError && <div className="auth-error">{inviteError}</div>}
+        </div>
+      )}
+      {canManageCourse && (
+        <div className="courses-hero">
+          <div className="row space-between">
+            <h3>Ассистенты курса</h3>
+            <button className="secondary" onClick={handleShowAssistants} disabled={assistantsLoading}>
+              {assistantsLoading ? "Загружаем..." : showAssistants ? "Скрыть" : "Управлять"}
+            </button>
+          </div>
+          {showAssistants && (
+            <>
+              <form className="add-assistant-form" onSubmit={handleAddAssistant}>
+                <input
+                  className="auth-input"
+                  type="email"
+                  placeholder="Email ассистента"
+                  value={addAssistantEmail}
+                  onChange={(e) => setAddAssistantEmail(e.target.value)}
+                  required
+                />
+                <button className="auth-button" type="submit" disabled={addAssistantLoading}>
+                  {addAssistantLoading ? "Добавляем..." : "Добавить"}
+                </button>
+              </form>
+              {addAssistantError && <div className="auth-error">{addAssistantError}</div>}
+              {assistants.length === 0 ? (
+                <div className="muted">Ассистентов пока нет.</div>
+              ) : (
+                <div className="assistants-permissions">
+                  {assistants.map((assistant) => {
+                    const name = `${assistant.first_name || ""} ${assistant.last_name || ""}`.trim() || assistant.email;
+                    return (
+                      <div key={assistant.user_id} className="assistant-permissions-row">
+                        <div className="assistant-name">
+                          <strong>{name}</strong>
+                          <span className="muted">{assistant.email}</span>
+                        </div>
+                        <div className="assistant-permissions-flags">
+                          {(
+                            [
+                              ["can_edit_homework", "Редактировать ДЗ"],
+                              ["can_review_homework", "Проверять ДЗ"],
+                              ["can_add_homework", "Добавлять ДЗ"],
+                              ["can_add_materials", "Добавлять материалы"],
+                            ] as const
+                          ).map(([field, label]) => (
+                            <label key={field} className="permission-toggle">
+                              <input
+                                type="checkbox"
+                                checked={assistant[field]}
+                                onChange={(e) => handleTogglePermission(assistant.user_id, field, e.target.checked)}
+                              />
+                              <span>{label}</span>
+                            </label>
+                          ))}
+                          <button
+                            type="button"
+                            className="danger small"
+                            onClick={() => handleRemoveAssistant(assistant.user_id)}
+                          >
+                            Удалить
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
       <div className="stack">

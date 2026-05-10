@@ -111,3 +111,46 @@ export function joinCourse(inviteCode: string) {
     json: { invite_code: inviteCode },
   });
 }
+
+export type AssistantPermissions = {
+  user_id: number;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  can_edit_homework: boolean;
+  can_review_homework: boolean;
+  can_add_homework: boolean;
+  can_add_materials: boolean;
+};
+
+export function fetchMyPermissions(courseId: string) {
+  return apiRequest<AssistantPermissions>(`/courses/${courseId}/my-permissions/`);
+}
+
+export function fetchCourseAssistants(courseId: string) {
+  return apiRequest<AssistantPermissions[]>(`/courses/${courseId}/assistants/`);
+}
+
+export function updateAssistantPermissions(
+  courseId: string,
+  userId: number,
+  permissions: Partial<Omit<AssistantPermissions, "user_id" | "email" | "first_name" | "last_name">>
+) {
+  return apiRequest<AssistantPermissions>(`/courses/${courseId}/staff/${userId}/permissions/`, {
+    method: "PATCH",
+    json: permissions,
+  });
+}
+
+export function addCourseAssistant(courseId: string, email: string) {
+  return apiRequest<AssistantPermissions>(`/courses/${courseId}/add-assistant/`, {
+    method: "POST",
+    json: { email },
+  });
+}
+
+export function removeCourseAssistant(courseId: string, userId: number) {
+  return apiRequest(`/courses/${courseId}/remove-assistant/${userId}/`, {
+    method: "DELETE",
+  });
+}

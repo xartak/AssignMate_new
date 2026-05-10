@@ -6,6 +6,7 @@ from courses.policies import (
     is_course_staff,
     is_student_enrolled,
     is_authenticated,
+    get_assistant_staff,
 )
 
 
@@ -55,11 +56,10 @@ class SubmissionPolicy:
         course = submission.assignment.lesson.course
         if getattr(user, "is_admin", False) or course.author_id == getattr(user, "id", None):
             return True
-        return is_course_staff(
-            user,
-            course,
-            roles=[CourseStaffRole.TEACHER, CourseStaffRole.ASSISTANT],
-        )
+        if is_course_staff(user, course, roles=[CourseStaffRole.TEACHER]):
+            return True
+        staff = get_assistant_staff(user, course)
+        return bool(staff and staff.can_review_homework)
 
 
 def filter_submissions_for_user(user, queryset, course):
@@ -107,3 +107,21 @@ class HomeworkPolicy:
         if not (is_authenticated(user) and getattr(user, "is_student", False)):
             return False
         return is_student_enrolled(user, course)
+
+    @staticmethod
+    def can_edit(user, course) -> bool:
+        """Проверяет право редактировать/создавать ДЗ.
+
+        Args:
+            user: Пользователь.
+            course: Курс.
+
+        Returns:
+            bool: True, если редактирование разрешено.
+        """
+        if not is_authenticated(user):
+            return False
+        if getattr(user, "is_admin", False) or course.author_id == getattr(user, "id", None):
+            return True
+        staff = get_assistant_staff(user, course)
+        return bool(staff and (staff.can_edit_homework or staff.can_add_homework))

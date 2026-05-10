@@ -123,6 +123,18 @@ function buildCrumbs(pathname: string): Crumb[] {
       crumbs.push({ label: "Личный кабинет", to: currentPath });
       continue;
     }
+
+    if (segment === "student-dashboard") {
+      currentPath += "/student-dashboard";
+      crumbs.push({ label: "Dashboard", to: currentPath });
+      continue;
+    }
+
+    if (segment === "my-stats" && segments[i - 2] === "courses") {
+      currentPath += "/my-stats";
+      crumbs.push({ label: "Моя статистика", to: currentPath });
+      continue;
+    }
   }
 
   return crumbs;
@@ -130,7 +142,10 @@ function buildCrumbs(pathname: string): Crumb[] {
 
 export function AppLayout() {
   const { role, logout } = useAuth();
-  const canViewDashboard = role === "teacher" || role === "admin" || role === "assistant";
+  const canViewTeacherDashboard = role === "teacher" || role === "admin" || role === "assistant";
+  const canViewStudentDashboard = role === "student" || role === "parent";
+  const dashboardLink = canViewTeacherDashboard ? "/dashboard" : "/student-dashboard";
+  const canViewDashboard = canViewTeacherDashboard || canViewStudentDashboard;
   const location = useLocation();
   const crumbs = buildCrumbs(location.pathname);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -162,7 +177,7 @@ export function AppLayout() {
           <div className={`nav-links${menuOpen ? " open" : ""}`}>
             <Link to="/courses" onClick={closeMenu}>Мои курсы</Link>
             <Link to="/cabinet" onClick={closeMenu}>Личный кабинет</Link>
-            {canViewDashboard && <Link to="/dashboard" onClick={closeMenu}>Dashboard</Link>}
+            {canViewDashboard && <Link to={dashboardLink} onClick={closeMenu}>Dashboard</Link>}
             <button className="secondary" onClick={() => { closeMenu(); logout(); }}>
               Выйти
             </button>

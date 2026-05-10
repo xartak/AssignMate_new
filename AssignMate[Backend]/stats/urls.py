@@ -9,6 +9,7 @@ from stats.views import (
     HomeworkStatsDetailView,
     CourseStudentsStatsView,
     CourseStudentDetailView,
+    StudentSelfStatsView,
 )
 
 urlpatterns = [
@@ -20,4 +21,5 @@ urlpatterns = [
     path("dashboard/courses/<int:course_id>/homeworks/<int:homework_order>/", HomeworkStatsDetailView.as_view(), name="homework-stats-detail"),
     path("dashboard/courses/<int:course_id>/students/", CourseStudentsStatsView.as_view(), name="course-students-stats"),
     path("dashboard/courses/<int:course_id>/students/<int:student_id>/", CourseStudentDetailView.as_view(), name="course-student-stats-detail"),
+    path("stats/me/courses/<int:course_id>/", StudentSelfStatsView.as_view(), name="student-self-stats"),
 ]

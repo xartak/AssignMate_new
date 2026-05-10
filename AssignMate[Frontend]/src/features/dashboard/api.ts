@@ -23,3 +23,8 @@ export function fetchCourseStudentDetail(courseId: string, studentId: string) {
     `/dashboard/courses/${courseId}/students/${studentId}/`
   );
 }
+
+export function fetchMyStats(courseId: string, studentId?: string) {
+  const params = studentId ? `?student_id=${studentId}` : "";
+  return apiRequest<CourseStudentDetail>(`/stats/me/courses/${courseId}/${params}`);
+}

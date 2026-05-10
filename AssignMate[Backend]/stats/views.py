@@ -1,8 +1,11 @@
 from django.shortcuts import get_object_or_404
+from rest_framework import permissions
+from rest_framework import status
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.models import ParentStudent
 from assignments.models import Assignment
 from courses.models import Course, Lesson
 from stats.permissions import CanViewCourseStats
@@ -223,5 +226,69 @@ class CourseStudentDetailView(APIView):
             status=EnrollmentStatus.ACTIVE,
         )
         data = course_student_detail_stats(course, enrollment.student)
+        serializer = CourseStudentDetailSerializer(data)
+        return Response(serializer.data)
+
+
+class StudentSelfStatsView(APIView):
+    """Статистика студента/родителя по курсу для себя."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, course_id: int):
+        """Возвращает статистику текущего пользователя (студент) или ребёнка (родитель).
+
+        Args:
+            request: DRF request.
+            course_id: Идентификатор курса.
+
+        Returns:
+            Response: Детальная статистика по студенту.
+        """
+        user = request.user
+        course = get_object_or_404(
+            Course.objects, 
+            pk=course_id,
+        )
+
+        if getattr(user, "is_student", False):
+            get_object_or_404(
+                Enrollment,
+                course=course,
+                student=user,
+                status=EnrollmentStatus.ACTIVE,
+            )
+            student = user
+        elif getattr(user, "is_parent", False):
+            student_id = request.query_params.get("student_id")
+            if student_id:
+                link = get_object_or_404(
+                    ParentStudent,
+                    parent=user,
+                    student_id=student_id,
+                )
+                get_object_or_404(
+                    Enrollment,
+                    course=course,
+                    student=link.student,
+                    status=EnrollmentStatus.ACTIVE,
+                )
+                student = link.student
+            else:
+                link = ParentStudent.objects.filter(
+                    parent=user,
+                    student__enrollments__course=course,
+                    student__enrollments__status=EnrollmentStatus.ACTIVE,
+                ).select_related("student").first()
+                if not link:
+                    return Response(
+                        {"detail": "Ребёнок не зачислен на этот курс."}, 
+                        status=status.HTTP_404_NOT_FOUND)
+                student = link.student
+        else:
+            return Response(
+                {"detail": "Нет доступа."}, 
+                status=status.HTTP_403_FORBIDDEN)
+
+        data = course_student_detail_stats(course, student)
         serializer = CourseStudentDetailSerializer(data)
         return Response(serializer.data)
