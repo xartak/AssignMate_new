@@ -1,7 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { fetchMyStats } from "@/features/dashboard/api";
+import { fetchChildren, type ChildLink } from "@/features/auth/api";
 import { useAsync } from "@/shared/hooks/useAsync";
+import { useAuth } from "@/shared/hooks/useAuth";
 import { Loader } from "@/shared/ui/Loader";
 import { ErrorState } from "@/shared/ui/ErrorState";
 import { EmptyState } from "@/shared/ui/EmptyState";
@@ -30,11 +32,36 @@ export function MyStatsPage() {
   }, []);
 
   const { courseId } = useParams();
+  const { role } = useAuth();
+  const isParent = role === "parent";
+
+  const [children, setChildren] = useState<ChildLink[]>([]);
+  const [childrenLoading, setChildrenLoading] = useState(false);
+  const [selectedChildId, setSelectedChildId] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!isParent) return;
+    setChildrenLoading(true);
+    fetchChildren()
+      .then((list) => {
+        setChildren(list);
+        if (list.length > 0 && selectedChildId === undefined) {
+          setSelectedChildId(String(list[0].student_id));
+        }
+      })
+      .finally(() => setChildrenLoading(false));
+  }, [isParent]);
+
   const statsState = useAsync(
-    () => (courseId ? fetchMyStats(courseId) : Promise.resolve(null)),
-    [courseId]
+    () => {
+      if (!courseId) return Promise.resolve(null);
+      if (isParent && selectedChildId === undefined) return Promise.resolve(null);
+      return fetchMyStats(courseId, isParent ? selectedChildId : undefined);
+    },
+    [courseId, isParent ? selectedChildId : ""]
   );
 
+  if (childrenLoading) return <Loader label="Загружаем данные..." />;
   if (statsState.loading) return <Loader label="Загружаем статистику..." />;
   if (statsState.error) return <ErrorState error={statsState.error} />;
   if (!statsState.data) return <EmptyState label="Нет данных." />;
@@ -55,13 +82,36 @@ export function MyStatsPage() {
     return "—";
   };
 
+  const selectedChild = children.find((c) => String(c.student_id) === selectedChildId);
+  const pageTitle = isParent && selectedChild
+    ? `Статистика: ${selectedChild.first_name} ${selectedChild.last_name}`.trim()
+    : "Моя статистика";
+
   return (
     <div className="courses-page">
       <div className="page-header">
         <div>
-          <h1>Моя статистика</h1>
+          <h1>{pageTitle}</h1>
           <p>{data.course_title}</p>
         </div>
+        {isParent && children.length > 1 && (
+          <div>
+            <label htmlFor="childSelect" className="muted" style={{ marginRight: 8 }}>
+              Ученик:
+            </label>
+            <select
+              id="childSelect"
+              value={selectedChildId ?? ""}
+              onChange={(e) => setSelectedChildId(e.target.value)}
+            >
+              {children.map((child) => (
+                <option key={child.student_id} value={String(child.student_id)}>
+                  {`${child.first_name} ${child.last_name}`.trim() || child.email}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="courses-hero">
@@ -104,7 +154,6 @@ export function MyStatsPage() {
               <span>Действие</span>
             </div>
             {data.homeworks.map((homework) => {
-              const canOpen = homework.status !== "NOT_SUBMITTED" || true;
               const homeworkPath = `/courses/${courseId}/lessons/${homework.lesson_order}/homeworks/${homework.homework_order}`;
               return (
                 <div className="homeworks-table-row" key={homework.homework_id}>
@@ -122,13 +171,9 @@ export function MyStatsPage() {
                     {formatScore(homework.status, homework.score)}
                   </span>
                   <span>
-                    {canOpen ? (
-                      <Link to={homeworkPath} className="action-button-link">
-                        Открыть
-                      </Link>
-                    ) : (
-                      <span className="action-button-link disabled">—</span>
-                    )}
+                    <Link to={homeworkPath} className="action-button-link">
+                      Открыть
+                    </Link>
                   </span>
                 </div>
               );

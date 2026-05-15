@@ -5,6 +5,7 @@ import { fetchHomeworks } from "@/features/lessons/api";
 import { useAsync } from "@/shared/hooks/useAsync";
 import { Loader } from "@/shared/ui/Loader";
 import { ErrorState } from "@/shared/ui/ErrorState";
+import { useAuth } from "@/shared/hooks/useAuth";
 
 export type SolveContext = {
   courseId: string;
@@ -12,6 +13,7 @@ export type SolveContext = {
   homeworks: HomeworkResponse[];
   currentOrder: number | null;
   isReview: boolean;
+  readOnly: boolean;
   reloadHomeworks: () => void;
 };
 
@@ -20,6 +22,8 @@ export function HomeworkSolveLayout() {
   const location = useLocation();
   const isReview = location.pathname.endsWith("/review");
   const [reloadKey, setReloadKey] = useState(0);
+  const { role } = useAuth();
+  const readOnly = role === "parent";
 
   const homeworksState = useAsync(
     () => fetchHomeworks(courseId, lessonOrder),
@@ -72,6 +76,7 @@ export function HomeworkSolveLayout() {
     homeworks,
     currentOrder,
     isReview,
+    readOnly,
     reloadHomeworks: () => setReloadKey((k) => k + 1),
   };
 
@@ -101,13 +106,15 @@ export function HomeworkSolveLayout() {
               </Link>
             );
           })}
-          <Link
-            className={`wizard-step review${isReview ? " active" : ""}`}
-            to={`/courses/${courseId}/lessons/${lessonOrder}/homeworks/solve/review`}
-            title="Итог"
-          >
-            Итог
-          </Link>
+          {!readOnly && (
+            <Link
+              className={`wizard-step review${isReview ? " active" : ""}`}
+              to={`/courses/${courseId}/lessons/${lessonOrder}/homeworks/solve/review`}
+              title="Итог"
+            >
+              Итог
+            </Link>
+          )}
         </div>
         <Outlet context={ctx} />
       </div>

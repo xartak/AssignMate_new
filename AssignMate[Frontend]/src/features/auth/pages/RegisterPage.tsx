@@ -56,7 +56,7 @@ export function RegisterPage() {
         <section className="auth-hero">
           <span className="auth-pill">AssignMate</span>
           <h1>Создайте рабочее пространство</h1>
-          <p>Зарегистрируйтесь и получите доступ, когда администратор назначит роль.</p>
+          <p>Зарегистрируйтесь, выберите свою роль и получите доступ к платформе.</p>
           <div className="auth-features">
             <div className="auth-feature">Отличная система контроля ответов и домашних заданий.</div>
             <div className="auth-feature">Лучшие преподаватели.</div>
@@ -143,9 +143,6 @@ export function RegisterPage() {
               {loading ? "Создаем..." : "Создать аккаунт"}
             </button>
           </form>
-          <div className="auth-footer">
-            Роль назначается администратором после регистрации.
-          </div>
           <div className="auth-footer">
             Уже есть аккаунт? <Link to="/login">Войти</Link>
           </div>

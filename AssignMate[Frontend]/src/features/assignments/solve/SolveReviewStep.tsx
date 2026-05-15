@@ -8,8 +8,9 @@ import type {
   MultipleChoiceDetails,
   ShortAnswerDetails,
   SingleChoiceDetails,
+  SubmissionResponse,
 } from "@/features/assignments/types";
-import { submitHomework, type SubmissionPayload } from "@/features/assignments/api";
+import { fetchSubmissions, submitHomework, type SubmissionPayload } from "@/features/assignments/api";
 import {
   clearHomeworkDraft,
   loadHomeworkDraft,
@@ -19,6 +20,7 @@ import type { ApiError } from "@/shared/api/base";
 import type { SolveContext } from "@/features/assignments/solve/HomeworkSolveLayout";
 
 type DraftMap = Record<number, HomeworkDraftPayload | null>;
+type SubmissionMap = Record<number, SubmissionResponse | null>;
 
 type AnswerStatus = "answered" | "partial" | "empty";
 
@@ -108,7 +110,9 @@ export function SolveReviewStep() {
   const ctx = useOutletContext<SolveContext>();
   const navigate = useNavigate();
 
+  // All hooks before conditional returns
   const [drafts, setDrafts] = useState<DraftMap>({});
+  const [submissionsMap, setSubmissionsMap] = useState<SubmissionMap>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -118,15 +122,26 @@ export function SolveReviewStep() {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const result: DraftMap = {};
+      const draftResult: DraftMap = {};
+      const subResult: SubmissionMap = {};
       for (const hw of ctx.homeworks) {
         const key = `homework-solve:${ctx.courseId}:${ctx.lessonOrder}:${hw.order}`;
+        let subs: SubmissionResponse[] = [];
         const stored = await loadHomeworkDraft(key);
+        if (!ctx.readOnly) {
+          try {
+            subs = await fetchSubmissions(ctx.courseId, ctx.lessonOrder, String(hw.order));
+          } catch {
+            subs = [];
+          }
+        }
         if (cancelled) return;
-        result[hw.order] = stored?.type === hw.type ? stored.payload : null;
+        draftResult[hw.order] = stored?.type === hw.type ? stored.payload : null;
+        subResult[hw.order] = subs[0] ?? null;
       }
       if (!cancelled) {
-        setDrafts(result);
+        setDrafts(draftResult);
+        setSubmissionsMap(subResult);
         setLoading(false);
       }
     }
@@ -134,7 +149,20 @@ export function SolveReviewStep() {
     return () => {
       cancelled = true;
     };
-  }, [ctx.homeworks, ctx.courseId, ctx.lessonOrder]);
+  }, [ctx.homeworks, ctx.courseId, ctx.lessonOrder, ctx.readOnly]);
+
+  if (ctx.readOnly) {
+    return (
+      <div className="wizard-card">
+        <p className="muted">Вы просматриваете задание в режиме чтения. Сдача недоступна.</p>
+        <div className="wizard-footer" style={{ marginTop: 16 }}>
+          <button type="button" className="secondary" onClick={() => navigate(`/courses/${ctx.courseId}/lessons/${ctx.lessonOrder}`)}>
+            Вернуться к уроку
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmitAll = async () => {
     setSubmitting(true);
@@ -142,6 +170,9 @@ export function SolveReviewStep() {
     setErrors({});
     const nextErrors: Record<number, string> = {};
     for (const hw of ctx.homeworks) {
+      const existing = submissionsMap[hw.order] ?? null;
+      if (existing && existing.status !== "REVISION") continue;
+
       const draft = drafts[hw.order] ?? null;
       const payload = buildPayload(hw, draft);
       if (!payload) {
@@ -199,8 +230,10 @@ export function SolveReviewStep() {
       ) : (
         <div className="wizard-review-table">
           {ctx.homeworks.map((hw) => {
+            const existing = submissionsMap[hw.order] ?? null;
+            const isAlreadySubmitted = Boolean(existing && existing.status !== "REVISION");
             const draft = drafts[hw.order] ?? null;
-            const st = classifyDraft(hw, draft);
+            const st = isAlreadySubmitted ? ("answered" as AnswerStatus) : classifyDraft(hw, draft);
             const err = errors[hw.order];
             return (
               <div key={hw.order} className="wizard-review-row">
@@ -211,7 +244,9 @@ export function SolveReviewStep() {
                   {err && <div className="auth-error" style={{ marginTop: 4 }}>{err}</div>}
                 </div>
                 <span className="meta-pill">{hw.max_score} балл.</span>
-                {statusPill(st)}
+                {isAlreadySubmitted
+                  ? <span className="status-pill status-pill-success">Сдано</span>
+                  : statusPill(st)}
               </div>
             );
           })}

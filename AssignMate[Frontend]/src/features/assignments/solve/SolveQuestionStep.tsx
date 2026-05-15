@@ -7,6 +7,7 @@ import type {
   MultipleChoiceDetails,
   ShortAnswerDetails,
   SingleChoiceDetails,
+  SubmissionResponse,
 } from "@/features/assignments/types";
 import { SingleChoiceForm } from "@/features/assignments/forms/SingleChoiceForm";
 import { MultipleChoiceForm } from "@/features/assignments/forms/MultipleChoiceForm";
@@ -20,6 +21,7 @@ import {
   type HomeworkDraftPayload,
 } from "@/shared/storage/homeworkDrafts";
 import type { SolveContext } from "@/features/assignments/solve/HomeworkSolveLayout";
+import { fetchSubmissions } from "@/features/assignments/api";
 
 function buildEmptyDraft(hw: HomeworkResponse): HomeworkDraftPayload {
   switch (hw.type) {
@@ -55,6 +57,31 @@ function normalizeFillBlankAnswers(
   }));
 }
 
+function submissionToDraft(hw: HomeworkResponse, details: unknown): HomeworkDraftPayload | null {
+  if (!details || typeof details !== "object") return null;
+  const d = details as Record<string, unknown>;
+  switch (hw.type) {
+    case "SINGLE_CHOICE": {
+      const opt = d.selected_option as { id: number } | null;
+      return { selected_option: opt?.id ?? null };
+    }
+    case "MULTIPLE_CHOICE": {
+      const opts = (d.selected_options as { id: number }[] | null) ?? [];
+      return { selected_options: opts.map((o) => o.id) };
+    }
+    case "FILL_BLANK": {
+      const answers = (d.answers as { position: number; answer_text: string }[] | null) ?? [];
+      return { answers };
+    }
+    case "SHORT_ANSWER":
+      return { answer_text: (d.answer_text as string) ?? "" };
+    case "LONG_ANSWER":
+      return { answer_text: (d.answer_text as string) ?? "", files: [] };
+    default:
+      return null;
+  }
+}
+
 export function SolveQuestionStep() {
   const ctx = useOutletContext<SolveContext>();
   const navigate = useNavigate();
@@ -66,6 +93,9 @@ export function SolveQuestionStep() {
   const [draft, setDraft] = useState<HomeworkDraftPayload | null>(null);
   const [loadingDraft, setLoadingDraft] = useState(true);
   const saveTimer = useRef<number | null>(null);
+
+  const [existingSubmission, setExistingSubmission] = useState<SubmissionResponse | null>(null);
+  const [submissionLoading, setSubmissionLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,7 +130,25 @@ export function SolveQuestionStep() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft, draftKey, hw?.id, hw?.type, loadingDraft]);
 
-  if (!hw || !draft) return <div className="muted">Задание не найдено.</div>;
+  useEffect(() => {
+    if (!hw || ctx.readOnly) {
+      setExistingSubmission(null);
+      setSubmissionLoading(false);
+      return;
+    }
+    setSubmissionLoading(true);
+    setExistingSubmission(null);
+    fetchSubmissions(ctx.courseId, ctx.lessonOrder, String(hw.order))
+      .then((subs) => setExistingSubmission(subs[0] ?? null))
+      .catch(() => setExistingSubmission(null))
+      .finally(() => setSubmissionLoading(false));
+  }, [hw?.id, ctx.courseId, ctx.lessonOrder, ctx.readOnly]);
+
+  const { readOnly } = ctx;
+  const isSubmitted = Boolean(existingSubmission && existingSubmission.status !== "REVISION");
+  const submittedDraft = isSubmitted && hw ? submissionToDraft(hw, existingSubmission!.details) : null;
+
+  if (!hw) return <div className="muted">Задание не найдено.</div>;
 
   const goPrev = () => {
     const idx = ctx.homeworks.findIndex((item) => item.order === hw.order);
@@ -117,8 +165,10 @@ export function SolveQuestionStep() {
     const next = ctx.homeworks[idx + 1];
     if (next) {
       navigate(`/courses/${ctx.courseId}/lessons/${ctx.lessonOrder}/homeworks/solve/${next.order}`);
-    } else {
+    } else if (!ctx.readOnly) {
       navigate(`/courses/${ctx.courseId}/lessons/${ctx.lessonOrder}/homeworks/solve/review`);
+    } else {
+      navigate(`/courses/${ctx.courseId}/lessons/${ctx.lessonOrder}`);
     }
   };
 
@@ -129,51 +179,92 @@ export function SolveQuestionStep() {
     setDraft(buildEmptyDraft(hw));
   };
 
-  const renderForm = () => {
+  const renderForm = (d: HomeworkDraftPayload, disabled = false) => {
     switch (hw.type) {
       case "SINGLE_CHOICE":
         return (
           <SingleChoiceForm
             details={hw.details as SingleChoiceDetails}
-            value={draft.selected_option ?? null}
-            onChange={(selected_option) => setDraft({ ...draft, selected_option })}
+            value={d.selected_option ?? null}
+            onChange={(selected_option) => setDraft({ ...d, selected_option })}
+            disabled={disabled}
           />
         );
       case "MULTIPLE_CHOICE":
         return (
           <MultipleChoiceForm
             details={hw.details as MultipleChoiceDetails}
-            value={draft.selected_options ?? []}
-            onChange={(selected_options) => setDraft({ ...draft, selected_options })}
+            value={d.selected_options ?? []}
+            onChange={(selected_options) => setDraft({ ...d, selected_options })}
+            disabled={disabled}
           />
         );
       case "FILL_BLANK":
         return (
           <FillBlankForm
             details={hw.details as FillBlankDetails}
-            value={normalizeFillBlankAnswers(hw.details as FillBlankDetails, draft.answers)}
-            onChange={(answers) => setDraft({ ...draft, answers })}
+            value={normalizeFillBlankAnswers(hw.details as FillBlankDetails, d.answers)}
+            onChange={(answers) => setDraft({ ...d, answers })}
+            disabled={disabled}
           />
         );
       case "SHORT_ANSWER":
         return (
           <ShortAnswerForm
             details={hw.details as ShortAnswerDetails}
-            value={draft.answer_text ?? ""}
-            onChange={(answer_text) => setDraft({ ...draft, answer_text })}
+            value={d.answer_text ?? ""}
+            onChange={(answer_text) => setDraft({ ...d, answer_text })}
+            disabled={disabled}
           />
         );
       case "LONG_ANSWER":
         return (
           <LongAnswerForm
             details={hw.details as LongAnswerDetails}
-            value={{ answer_text: draft.answer_text ?? "", files: draft.files ?? [] }}
-            onChange={(value) => setDraft({ ...draft, ...value })}
+            value={{ answer_text: d.answer_text ?? "", files: d.files ?? [] }}
+            onChange={(value) => setDraft({ ...d, ...value })}
+            disabled={disabled}
           />
         );
       default:
         return <div className="muted">Неизвестный тип задания.</div>;
     }
+  };
+
+  const renderAnswerCard = () => {
+    if (readOnly) {
+      return (
+        <div className="wizard-card">
+          <span className="wizard-card-title muted">Просмотр задания</span>
+          <p className="muted">Вы просматриваете задание в режиме чтения.</p>
+        </div>
+      );
+    }
+    if (submissionLoading) {
+      return (
+        <div className="wizard-card">
+          <span className="wizard-card-title">Ваш ответ</span>
+          <div className="muted">Загружаем черновик…</div>
+        </div>
+      );
+    }
+    if (isSubmitted && submittedDraft) {
+      return (
+        <div className="wizard-card">
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+            <span className="wizard-card-title">Ваш ответ</span>
+            <span className="status-pill status-pill-success">Сдано</span>
+          </div>
+          {renderForm(submittedDraft, true)}
+        </div>
+      );
+    }
+    return (
+      <div className="wizard-card">
+        <span className="wizard-card-title">Ваш ответ</span>
+        {loadingDraft ? <div className="muted">Загружаем черновик…</div> : draft && renderForm(draft)}
+      </div>
+    );
   };
 
   return (
@@ -183,17 +274,16 @@ export function SolveQuestionStep() {
         <div>{hw.description || hw.title || "—"}</div>
       </div>
 
-      <div className="wizard-card">
-        <span className="wizard-card-title">Ваш ответ</span>
-        {loadingDraft ? <div className="muted">Загружаем черновик…</div> : renderForm()}
-      </div>
+      {renderAnswerCard()}
 
       <div className="wizard-footer">
         <button type="button" className="secondary" onClick={goPrev}>Предыдущее</button>
         <div className="row" style={{ gap: 10 }}>
-          <button type="button" className="danger" onClick={handleReset} title="Очистить ответ">
-            Очистить
-          </button>
+          {!readOnly && !isSubmitted && (
+            <button type="button" className="danger" onClick={handleReset} title="Очистить ответ">
+              Очистить
+            </button>
+          )}
           <button type="button" className="primary" onClick={goNext}>
             Следующее
           </button>

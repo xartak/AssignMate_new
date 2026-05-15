@@ -61,7 +61,7 @@ export function ChoiceQuestionStep() {
   ): Promise<boolean> => {
     const validOptions = snapshot.options
       .filter((o) => o.text.trim())
-      .map(({ text, is_correct }) => ({ text: text.trim(), is_correct }));
+      .map(({ id, text, is_correct }) => ({ ...(id !== undefined ? { id } : {}), text: text.trim(), is_correct }));
     if (validOptions.length < 2) {
       setError("Нужно минимум два варианта ответа с текстом.");
       return false;

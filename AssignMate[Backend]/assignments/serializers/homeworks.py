@@ -112,9 +112,11 @@ class QuestionOptionWriteSerializer(serializers.Serializer):
     """Сериализатор для записи вариантов ответа.
 
     Attributes:
+        id: Идентификатор варианта (для обновления существующих, необязательно).
         text: Текст варианта ответа.
         is_correct: Признак корректного ответа.
     """
+    id = serializers.IntegerField(required=False)
     text = serializers.CharField()
     is_correct = serializers.BooleanField(default=False)
 
@@ -250,7 +252,7 @@ class SingleChoiceAssignmentWriteSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def _replace_options(assignment, options_data):
-        """Полностью заменяет варианты ответов для задания.
+        """Обновляет варианты ответов, сохраняя ID существующих.
 
         Args:
             assignment: Экземпляр задания.
@@ -259,9 +261,18 @@ class SingleChoiceAssignmentWriteSerializer(serializers.ModelSerializer):
         Returns:
             None.
         """
-        assignment.options.all().delete()
+        incoming_ids = {o["id"] for o in options_data if "id" in o}
+        assignment.options.exclude(id__in=incoming_ids).delete()
         for option in options_data:
-            QuestionOption.objects.create(assignment=assignment, **option)
+            opt_id = option.get("id")
+            if opt_id:
+                assignment.options.filter(id=opt_id).update(
+                    text=option["text"], is_correct=option["is_correct"]
+                )
+            else:
+                QuestionOption.objects.create(
+                    assignment=assignment, text=option["text"], is_correct=option["is_correct"]
+                )
 
 
 class MultipleChoiceAssignmentWriteSerializer(serializers.ModelSerializer):
@@ -324,7 +335,7 @@ class MultipleChoiceAssignmentWriteSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def _replace_options(assignment, options_data):
-        """Полностью заменяет варианты ответов для задания.
+        """Обновляет варианты ответов, сохраняя ID существующих.
 
         Args:
             assignment: Экземпляр задания.
@@ -333,9 +344,18 @@ class MultipleChoiceAssignmentWriteSerializer(serializers.ModelSerializer):
         Returns:
             None.
         """
-        assignment.options.all().delete()
+        incoming_ids = {o["id"] for o in options_data if "id" in o}
+        assignment.options.exclude(id__in=incoming_ids).delete()
         for option in options_data:
-            QuestionOption.objects.create(assignment=assignment, **option)
+            opt_id = option.get("id")
+            if opt_id:
+                assignment.options.filter(id=opt_id).update(
+                    text=option["text"], is_correct=option["is_correct"]
+                )
+            else:
+                QuestionOption.objects.create(
+                    assignment=assignment, text=option["text"], is_correct=option["is_correct"]
+                )
 
 
 class FillBlankAssignmentWriteSerializer(serializers.ModelSerializer):
@@ -515,7 +535,7 @@ class HomeworkReadSerializer(serializers.ModelSerializer):
         detail = get_assignment_detail_instance(obj)
         if detail is None:
             return None
-        return serializer_cls(detail).data
+        return serializer_cls(detail, context=self.context).data
 
 
 class HomeworkWriteSerializer(serializers.ModelSerializer):
@@ -866,7 +886,7 @@ class SubmissionReadSerializer(serializers.ModelSerializer):
         detail = get_submission_detail_instance(obj)
         if detail is None:
             return None
-        return serializer_cls(detail).data
+        return serializer_cls(detail, context=self.context).data
 
     def get_student_name(self, obj):
         """Возвращает отображаемое имя студента.

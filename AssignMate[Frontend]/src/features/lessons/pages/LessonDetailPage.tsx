@@ -66,15 +66,15 @@ export function LessonDetailPage() {
     );
   }, [lessonState.data]);
 
+  const isAdmin = role === "admin";
+  const isAuthor = courseState.data?.author === userId;
+  const { perms: assistantPerms } = useAssistantPermissions(courseId);
+
   if (lessonState.loading || homeworksState.loading || lessonsNavState.loading) {
     return <Loader />;
   }
   if (lessonState.error) return <ErrorState error={lessonState.error} />;
   if (!lessonData) return <EmptyState label="Урок не найден" />;
-
-  const isAdmin = role === "admin";
-  const isAuthor = courseState.data?.author === userId;
-  const { perms: assistantPerms } = useAssistantPermissions(courseId);
   const canManageLesson =
     isAdmin ||
     (role === "teacher" && isAuthor) ||
