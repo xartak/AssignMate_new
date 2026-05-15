@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 
 if [ -n "${DATABASE_URL:-}" ] || [ -n "${DATABASE_NAME:-}" ]; then
@@ -35,11 +35,6 @@ fi
 
 echo "Applying migrations..."
 python manage.py migrate --noinput
-
-if [ "${DJANGO_COLLECTSTATIC:-0}" = "1" ]; then
-  echo "Collecting static..."
-  python manage.py collectstatic --noinput
-fi
 
 if [ -n "${DJANGO_SUPERUSER_EMAIL:-}" ] && [ -n "${DJANGO_SUPERUSER_PASSWORD:-}" ]; then
   echo "Ensuring superuser..."

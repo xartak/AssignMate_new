@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16
     environment:
       POSTGRES_DB: ${BACKEND_DATABASE_NAME}
       POSTGRES_USER: ${BACKEND_DATABASE_USER}
@@ -8,7 +8,12 @@ services:
     volumes:
       - ./DockerVolumes/db-data:/var/lib/postgresql/data
     ports:
-      - "${BACKEND_DATABASE_EXTERNAL_PORT}:${BACKEND_DATABASE_INTERNAL_PORT}"
+      - "${BACKEND_DATABASE_EXTERNAL_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${BACKEND_DATABASE_USER} -d ${BACKEND_DATABASE_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
@@ -17,6 +22,11 @@ services:
       target: dev
     env_file:
       - .env
+    environment:
+      BACKEND_DATABASE_HOST: db
+      BACKEND_DATABASE_INTERNAL_PORT: 5432
+      BACKEND_DJANGO_SUPERUSER_EMAIL: admin@mail.com
+      BACKEND_DJANGO_SUPERUSER_PASSWORD: adminadmin
     volumes:
       - ./AssignMate[Backend]:/app
       - ./DockerVolumes/static:/app/static
@@ -24,7 +34,8 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   frontend:
     build:
@@ -45,7 +56,7 @@ services:
       - "5173:5173"
 
   tg_bot_db:
-    image: postgres:16-alpine
+    image: postgres:16
     environment:
       POSTGRES_DB: ${TG_BOT_DATABASE__NAME}
       POSTGRES_USER: ${TG_BOT_DATABASE__USER}
@@ -53,8 +64,12 @@ services:
     volumes:
       - ./DockerVolumes/tg-bot-db-data:/var/lib/postgresql/data
     ports:
-      - "${TG_BOT_DATABASE__EXTERNAL_PORT}:${TG_BOT_DATABASE__INTERNAL_PORT}"
-
+      - "${TG_BOT_DATABASE__EXTERNAL_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TG_BOT_DATABASE__USER} -d ${TG_BOT_DATABASE__NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   tg_bot:
     build:
@@ -62,9 +77,14 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env
+    environment:
+      TG_BOT_DATABASE__HOST: tg_bot_db
+      TG_BOT_DATABASE__INTERNAL_PORT: 5432
     depends_on:
-      - tg_bot_db
-      - backend
+      tg_bot_db:
+        condition: service_healthy
+      backend:
+        condition: service_started
 
   vk_bot_db:
     image: postgres:16-alpine
@@ -75,7 +95,12 @@ services:
     volumes:
       - ./DockerVolumes/vk-bot-db-data:/var/lib/postgresql/data
     ports:
-      - "${VK_BOT_DATABASE__EXTERNAL_PORT}:${VK_BOT_DATABASE__INTERNAL_PORT}"
+      - "${VK_BOT_DATABASE__EXTERNAL_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${VK_BOT_DATABASE__USER} -d ${VK_BOT_DATABASE__NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   vk_bot:
     build:
